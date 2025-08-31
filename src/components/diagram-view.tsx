@@ -89,7 +89,7 @@ function Element({
   };
   
   const styleProps = {
-    fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent',
+    fill: isSelected ? 'transparent' : (element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent'),
     stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
     cursor: 'move',
@@ -229,16 +229,6 @@ function Element({
   return (
     <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       {renderElement()}
-      {isSelected && !isEditing && (
-          <rect
-              {...commonProps}
-              fill="transparent"
-              stroke="hsl(var(--primary))"
-              strokeWidth="2"
-              rx="8" ry="8"
-              style={{ pointerEvents: 'none' }}
-            />
-      )}
       {isSelected && !isEditing && handles.map(handle => (
           <rect
               key={handle.position}
@@ -246,28 +236,26 @@ function Element({
               y={handle.y}
               width={handleSize}
               height={handleSize}
-              fill="transparent"
+              fill="hsl(var(--background))"
               stroke="hsl(var(--primary))"
               strokeWidth="1"
               cursor={handle.cursor}
               onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
           />
       ))}
-      {isHovered && !isSelected && !isEditing && anchors.map(anchor => (
-         <g key={anchor.side} onMouseDown={(e) => onMouseDown(e, element.id, anchor.side)} cursor="crosshair">
-            <rect
-                x={anchor.x}
-                y={anchor.y}
-                width={anchorSize}
-                height={anchorSize}
-                rx="2"
-                ry="2"
-                fill="hsl(var(--primary))"
-                stroke="hsl(var(--primary-foreground))"
-                strokeWidth="1"
-            />
-         </g>
-      ))}
+       {isHovered && !isSelected && !isEditing && (
+        <rect
+          x={element.x}
+          y={element.y}
+          width={element.width}
+          height={element.height}
+          fill="transparent"
+          stroke="hsl(var(--primary))"
+          strokeWidth="1"
+          rx="8" ry="8"
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
     </g>
   );
 }

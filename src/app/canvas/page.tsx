@@ -59,6 +59,7 @@ export default function CanvasPage() {
       const savedElements = localStorage.getItem('canvasnote-elements');
       const savedConnections = localStorage.getItem('canvasnote-connections');
       const savedToolbarPos = localStorage.getItem('canvasnote-toolbar-pos');
+      const savedTransform = localStorage.getItem('canvasnote-transform');
       if (savedNotes) setNotes(JSON.parse(savedNotes));
       if (savedElements) setElements(JSON.parse(savedElements));
       if (savedConnections) setConnections(JSON.parse(savedConnections));
@@ -67,6 +68,8 @@ export default function CanvasPage() {
       } else if(canvasContainerRef.current) {
         setToolbarPosition({ x: 16, y: canvasContainerRef.current.clientHeight / 2 - 150 });
       }
+      if (savedTransform) setTransform(JSON.parse(savedTransform));
+
     } catch (error) {
       console.error("Failed to load from localStorage", error);
       toast({ variant: "destructive", title: "Error", description: "Could not load saved data." });
@@ -81,10 +84,11 @@ export default function CanvasPage() {
       localStorage.setItem('canvasnote-elements', JSON.stringify(elements));
       localStorage.setItem('canvasnote-connections', JSON.stringify(connections));
       localStorage.setItem('canvasnote-toolbar-pos', JSON.stringify(toolbarPosition));
+      localStorage.setItem('canvasnote-transform', JSON.stringify(transform));
     } catch (error) {
       console.error("Failed to save to localStorage", error);
     }
-  }, [notes, elements, connections, toolbarPosition, isMounted]);
+  }, [notes, elements, connections, toolbarPosition, transform, isMounted]);
   
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
@@ -244,11 +248,10 @@ export default function CanvasPage() {
     }
     const { clientX: mouseX, clientY: mouseY } = e;
     const canvasCoords = screenToCanvas(mouseX, mouseY);
-    initialState.current = { mouseX, mouseY };
+    initialState.current = { mouseX, mouseY, initialTransform: { ...transform } };
 
     if (e.button === 1 || e.metaKey || e.ctrlKey) { // Pan with middle mouse or cmd/ctrl + click
       setAction('panning');
-      initialState.current.initialTransform = { ...transform };
       return;
     }
     
