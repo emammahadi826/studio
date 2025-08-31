@@ -59,6 +59,31 @@ export default function Home() {
       console.error("Failed to save to localStorage", error);
     }
   }, [notes, elements, connections, isMounted]);
+  
+  const handleDeleteElement = useCallback(() => {
+    if (!selectedElementId) return;
+
+    setElements(prev => prev.filter(el => el.id !== selectedElementId));
+    setConnections(prev => prev.filter(conn => conn.source.elementId !== selectedElementId && conn.target.elementId !== selectedElementId));
+    setSelectedElementId(null);
+    toast({ title: 'Element Deleted' });
+  }, [selectedElementId, toast]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
+            e.preventDefault(); // Prevent browser back navigation on backspace
+            handleDeleteElement();
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedElementId, handleDeleteElement]);
+
 
   const handleAddElement = (type: DiagramElement['type']) => {
     const newElement: DiagramElement = {
