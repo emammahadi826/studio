@@ -1,13 +1,24 @@
+
 'use client';
 
 import React, { useState } from 'react';
-import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder } from 'lucide-react';
+import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Move } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DiagramElement, DiagramConnection } from '@/types';
 import { cn } from '@/lib/utils';
 
-function DiagramToolbar({ onToolSelect, activeTool }: { onToolSelect: (type: DiagramElement['type']) => void, activeTool: DiagramElement['type'] | null }) {
+function DiagramToolbar({ 
+    onToolSelect, 
+    activeTool,
+    position,
+    onMouseDown,
+}: { 
+    onToolSelect: (type: DiagramElement['type']) => void, 
+    activeTool: DiagramElement['type'] | null 
+    position: { x: number, y: number },
+    onMouseDown: (e: React.MouseEvent) => void,
+}) {
   const tools = [
     { type: 'rectangle', icon: Square, label: 'Rectangle' },
     { type: 'circle', icon: Circle, label: 'Circle' },
@@ -19,7 +30,16 @@ function DiagramToolbar({ onToolSelect, activeTool }: { onToolSelect: (type: Dia
   ] as const;
 
   return (
-    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-10 bg-card p-2 rounded-lg border shadow-md flex flex-col gap-1">
+    <div 
+        className="absolute z-10 bg-card p-2 rounded-lg border shadow-md flex flex-col gap-1"
+        style={{ top: position.y, left: position.x }}
+    >
+      <div 
+        className="cursor-move text-center py-1 text-muted-foreground"
+        onMouseDown={onMouseDown}
+      >
+        <Move className="w-4 h-4 mx-auto" />
+      </div>
       <TooltipProvider delayDuration={0}>
         {tools.map((tool) => (
           <Tooltip key={tool.type}>
@@ -69,8 +89,8 @@ function Element({
   };
   
   const styleProps = {
-    fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'hsl(var(--card))',
-    stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
+    fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent',
+    stroke: isSelected ? 'hsl(var(--primary-foreground))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
     cursor: 'move',
   };
@@ -233,7 +253,7 @@ function Element({
               onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
           />
       ))}
-      {(isHovered || isSelected) && !isEditing && anchors.map(anchor => (
+      {isHovered && !isSelected && !isEditing && anchors.map(anchor => (
          <g key={anchor.side} onMouseDown={(e) => onMouseDown(e, element.id, anchor.side)} cursor="crosshair">
             <rect
                 x={anchor.x}
@@ -363,12 +383,32 @@ interface DiagramViewProps {
   activeTool: DiagramElement['type'] | null;
   editingElementId: string | null;
   onElementDoubleClick: (elementId: string) => void;
+  toolbarPosition: { x: number; y: number; };
+  onToolbarMouseDown: (e: React.MouseEvent) => void;
 }
 
-export function DiagramView({ elements, connections, ghostElement, marqueeRect, onToolSelect, onCanvasMouseDown, selectedElementIds, activeTool, editingElementId, onElementDoubleClick }: DiagramViewProps) {
+export function DiagramView({ 
+    elements, 
+    connections, 
+    ghostElement, 
+    marqueeRect, 
+    onToolSelect, 
+    onCanvasMouseDown, 
+    selectedElementIds, 
+    activeTool, 
+    editingElementId, 
+    onElementDoubleClick,
+    toolbarPosition,
+    onToolbarMouseDown,
+}: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
-      <DiagramToolbar onToolSelect={onToolSelect} activeTool={activeTool} />
+      <DiagramToolbar 
+        onToolSelect={onToolSelect} 
+        activeTool={activeTool} 
+        position={toolbarPosition}
+        onMouseDown={onToolbarMouseDown}
+       />
       <svg 
         id="diagram-canvas" 
         width="100%" 

@@ -11,7 +11,7 @@ import type { DiagramElement, DiagramConnection } from '@/types';
 import { useSidebar } from '@/components/ui/sidebar';
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing';
+type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
@@ -37,6 +37,7 @@ export default function CanvasPage() {
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 16, y: 16 });
   
   const initialState = useRef<{
     elements?: DiagramElement[];
@@ -44,17 +45,26 @@ export default function CanvasPage() {
     mouseY: number;
     sourceElementId?: string;
     anchorSide?: AnchorSide;
+    toolbarX?: number;
+    toolbarY?: number;
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
       const savedNotes = localStorage.getItem('canvasnote-notes');
       const savedElements = localStorage.getItem('canvasnote-elements');
       const savedConnections = localStorage.getItem('canvasnote-connections');
+      const savedToolbarPos = localStorage.getItem('canvasnote-toolbar-pos');
       if (savedNotes) setNotes(JSON.parse(savedNotes));
       if (savedElements) setElements(JSON.parse(savedElements));
       if (savedConnections) setConnections(JSON.parse(savedConnections));
+      if (savedToolbarPos) {
+        setToolbarPosition(JSON.parse(savedToolbarPos));
+      } else if(canvasContainerRef.current) {
+        setToolbarPosition({ x: 16, y: canvasContainerRef.current.clientHeight / 2 - 150 });
+      }
     } catch (error) {
       console.error("Failed to load from localStorage", error);
       toast({ variant: "destructive", title: "Error", description: "Could not load saved data." });
@@ -68,10 +78,11 @@ export default function CanvasPage() {
       localStorage.setItem('canvasnote-notes', JSON.stringify(notes));
       localStorage.setItem('canvasnote-elements', JSON.stringify(elements));
       localStorage.setItem('canvasnote-connections', JSON.stringify(connections));
+      localStorage.setItem('canvasnote-toolbar-pos', JSON.stringify(toolbarPosition));
     } catch (error) {
       console.error("Failed to save to localStorage", error);
     }
-  }, [notes, elements, connections, isMounted]);
+  }, [notes, elements, connections, toolbarPosition, isMounted]);
   
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
@@ -206,6 +217,17 @@ a.click();
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!', description: 'Your diagram has been downloaded as an SVG file.' });
   }, [toast]);
+  
+  const handleToolbarMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAction('draggingToolbar');
+    initialState.current = { 
+        mouseX: e.clientX, 
+        mouseY: e.clientY,
+        toolbarX: toolbarPosition.x,
+        toolbarY: toolbarPosition.y,
+    };
+  };
 
   const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => {
     if (action === 'editing') {
@@ -275,7 +297,21 @@ a.click();
     const dx = clientX - initialState.current.mouseX;
     const dy = clientY - initialState.current.mouseY;
 
-    if (action === 'marquee') {
+    if (action === 'draggingToolbar') {
+        if (!canvasContainerRef.current || !initialState.current.toolbarX || !initialState.current.toolbarY) return;
+        
+        const containerRect = canvasContainerRef.current.getBoundingClientRect();
+        const toolbarWidth = 52; // approx width
+        const toolbarHeight = 316; // approx height
+
+        let newX = initialState.current.toolbarX + dx;
+        let newY = initialState.current.toolbarY + dy;
+
+        newX = Math.max(0, Math.min(newX, containerRect.width - toolbarWidth));
+        newY = Math.max(0, Math.min(newY, containerRect.height - toolbarHeight));
+
+        setToolbarPosition({ x: newX, y: newY });
+    } else if (action === 'marquee') {
         if (!initialState.current) return;
         const { mouseX, mouseY } = initialState.current;
         const x = Math.min(mouseX, clientX);
@@ -431,6 +467,7 @@ a.click();
       <div 
         className="flex-grow relative"
         style={{ paddingTop }}
+        ref={canvasContainerRef}
       >
           <div className={`w-full h-full transition-opacity duration-300 ease-in-out ${view === 'notepad' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <NotepadView content={notes} onContentChange={setNotes} />
@@ -457,6 +494,8 @@ a.click();
                   activeTool={activeTool}
                   editingElementId={editingElementId}
                   onElementDoubleClick={handleElementDoubleClick}
+                  toolbarPosition={toolbarPosition}
+                  onToolbarMouseDown={handleToolbarMouseDown}
               />
             </div>
              {action === 'editing' && editingElementId && (
