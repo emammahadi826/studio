@@ -5,8 +5,9 @@ import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Plus } f
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DiagramElement, DiagramConnection } from '@/types';
+import { cn } from '@/lib/utils';
 
-function DiagramToolbar({ onAddElement }: { onAddElement: (type: DiagramElement['type']) => void }) {
+function DiagramToolbar({ onToolSelect, activeTool }: { onToolSelect: (type: DiagramElement['type']) => void, activeTool: DiagramElement['type'] | null }) {
   const tools = [
     { type: 'rectangle', icon: Square, label: 'Rectangle' },
     { type: 'circle', icon: Circle, label: 'Circle' },
@@ -23,7 +24,12 @@ function DiagramToolbar({ onAddElement }: { onAddElement: (type: DiagramElement[
         {tools.map((tool) => (
           <Tooltip key={tool.type}>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={() => onAddElement(tool.type)}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => onToolSelect(tool.type)}
+                className={cn(activeTool === tool.type && 'bg-accent')}
+              >
                 <tool.icon className="w-5 h-5" />
               </Button>
             </TooltipTrigger>
@@ -266,15 +272,16 @@ interface DiagramViewProps {
   connections: DiagramConnection[];
   ghostElement: DiagramElement | null;
   marqueeRect: { x: number; y: number; width: number; height: number; } | null;
-  onAddElement: (type: DiagramElement['type']) => void;
+  onToolSelect: (type: DiagramElement['type']) => void;
   onCanvasMouseDown: (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
   selectedElementIds: string[];
+  activeTool: DiagramElement['type'] | null;
 }
 
-export function DiagramView({ elements, connections, ghostElement, marqueeRect, onAddElement, onCanvasMouseDown, selectedElementIds }: DiagramViewProps) {
+export function DiagramView({ elements, connections, ghostElement, marqueeRect, onToolSelect, onCanvasMouseDown, selectedElementIds, activeTool }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
-      <DiagramToolbar onAddElement={onAddElement} />
+      <DiagramToolbar onToolSelect={onToolSelect} activeTool={activeTool} />
       <svg 
         id="diagram-canvas" 
         width="100%" 

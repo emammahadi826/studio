@@ -9,7 +9,7 @@ import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection } from '@/types';
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'marquee';
+type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
@@ -27,6 +27,7 @@ export default function Home() {
   const { toast } = useToast();
 
   const [action, setAction] = useState<Action>('none');
+  const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
@@ -81,6 +82,9 @@ export default function Home() {
             e.preventDefault(); 
             handleDeleteSelected();
         }
+        if (e.key === 'Escape') {
+          setActiveTool(null);
+        }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -91,18 +95,8 @@ export default function Home() {
   }, [selectedElementIds, handleDeleteSelected]);
 
 
-  const handleAddElement = (type: DiagramElement['type']) => {
-    const newElement: DiagramElement = {
-      id: `el-${Date.now()}`,
-      type,
-      content: `New ${type}`,
-      x: Math.random() * 300 + 50,
-      y: Math.random() * 300 + 50,
-      width: type === 'diamond' || type === 'triangle' ? 180 : 150,
-      height: type === 'sticky-note' ? 150 : (type === 'diamond' || type === 'triangle' ? 120 : 80),
-      backgroundColor: type === 'sticky-note' ? '#FFF9C4' : undefined,
-    };
-    setElements(prev => [...prev, newElement]);
+  const handleToolSelect = (type: DiagramElement['type']) => {
+    setActiveTool(type);
   };
   
   const handleGenerateDiagram = useCallback(async () => {
@@ -187,6 +181,21 @@ a.click();
 
   const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => {
     const { clientX: mouseX, clientY: mouseY } = e;
+
+    if (activeTool) {
+      setAction('creatingShape');
+      initialState.current = { mouseX, mouseY };
+      setGhostElement({
+        id: 'ghost',
+        type: activeTool,
+        content: '',
+        x: mouseX,
+        y: mouseY,
+        width: 0,
+        height: 0,
+      });
+      return;
+    }
     
     if (elementId) {
         const selectedElement = elements.find(el => el.id === elementId);
@@ -250,6 +259,16 @@ a.click();
             return [...new Set([...baseIds, ...intersectingIds])];
         });
 
+    } else if (action === 'creatingShape' && activeTool) {
+        const { mouseX, mouseY } = initialState.current;
+        const newElement: DiagramElement = {
+            id: 'ghost', type: activeTool, content: '',
+            x: clientX > mouseX ? mouseX : clientX,
+            y: clientY > mouseY ? mouseY : clientY,
+            width: Math.abs(dx), height: Math.abs(dy),
+        };
+        setGhostElement(newElement);
+
     } else if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide) {
       const { mouseX, mouseY } = initialState.current;
       const newElement: DiagramElement = {
@@ -277,7 +296,7 @@ a.click();
                     let { x, y, width, height } = originalElement;
                     const minSize = 20;
 
-                    if (resizingHandle.includes('bottom')) { width = Math.max(minSize, originalElement.width + dy); }
+                    if (resizingHandle.includes('bottom')) { height = Math.max(minSize, originalElement.height + dy); }
                     if (resizingHandle.includes('top')) {
                         const newHeight = originalElement.height - dy;
                         height = newHeight > minSize ? newHeight : minSize;
@@ -298,7 +317,19 @@ a.click();
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
-    if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
+    if (action === 'creatingShape' && ghostElement && activeTool) {
+      if (ghostElement.width > 5 && ghostElement.height > 5) {
+        const newElement: DiagramElement = {
+          ...ghostElement,
+          id: `el-${Date.now()}`,
+          content: `New ${activeTool}`,
+          backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
+        };
+        setElements(prev => [...prev, newElement]);
+      }
+      setActiveTool(null);
+    }
+    else if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
         const sourceElementId = initialState.current.sourceElementId;
         const newElementId = `el-${Date.now()}`;
         const finalGhost = { ...ghostElement, id: newElementId, content: 'New rectangle' };
@@ -321,7 +352,7 @@ a.click();
   };
   
   return (
-    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col" onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}>
+    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
       <CanvasHeader
         view={view}
         onViewChange={setView}
@@ -337,20 +368,24 @@ a.click();
           <div className={`w-full h-full transition-opacity duration-300 ease-in-out ${view === 'notepad' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <NotepadView content={notes} onContentChange={setNotes} />
           </div>
-          <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            onMouseMove={handleCanvasMouseMove} 
+            onMouseUp={handleCanvasMouseUp} 
+            onMouseLeave={handleCanvasMouseUp}
+            style={{ cursor: activeTool ? 'crosshair' : 'default' }}
+          >
             <DiagramView 
                 elements={elements} 
                 connections={connections} 
                 ghostElement={ghostElement}
                 marqueeRect={marqueeRect}
-                onAddElement={handleAddElement}
+                onToolSelect={handleToolSelect}
                 onCanvasMouseDown={handleCanvasMouseDown}
                 selectedElementIds={selectedElementIds}
+                activeTool={activeTool}
             />
           </div>
       </div>
     </main>
   );
 }
-
-    
