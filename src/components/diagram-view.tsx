@@ -63,12 +63,19 @@ function Element({
     width: element.width,
     height: element.height,
   };
+  
+  const styleProps = {
+    fill: isSelected ? 'transparent' : (element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'hsl(var(--card))'),
+    stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
+    strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
+    cursor: 'move',
+  };
 
   const textDiv = (
     <div 
         xmlns="http://www.w3.org/1999/xhtml" 
         className="flex items-center justify-center h-full text-center p-2 break-words text-sm font-sans"
-        style={{ color: 'hsl(var(--foreground))', fontFamily: 'Inter', pointerEvents: 'none' }}
+        style={{ color: isSelected ? 'hsl(var(--foreground))' : 'hsl(var(--foreground))', fontFamily: 'Inter', pointerEvents: 'none' }}
     >
         {element.content}
     </div>
@@ -109,14 +116,14 @@ function Element({
       case 'rectangle':
         return (
           <>
-            <rect {...commonProps} rx="8" ry="8" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <rect {...commonProps} {...styleProps} rx="8" ry="8" onMouseDown={(e) => onMouseDown(e, element.id)} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       case 'circle':
         return (
           <>
-            <ellipse cx={element.x + element.width / 2} cy={element.y + element.height / 2} rx={element.width / 2} ry={element.height / 2} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <ellipse cx={element.x + element.width / 2} cy={element.y + element.height / 2} rx={element.width / 2} ry={element.height / 2} {...styleProps} onMouseDown={(e) => onMouseDown(e, element.id)} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -125,7 +132,7 @@ function Element({
         const points = `${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}`;
         return (
           <>
-            <polygon points={points} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <polygon points={points} {...styleProps} onMouseDown={(e) => onMouseDown(e, element.id)} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -134,7 +141,7 @@ function Element({
         const points = `${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`;
         return (
           <>
-            <polygon points={points} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <polygon points={points} {...styleProps} onMouseDown={(e) => onMouseDown(e, element.id)} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -144,26 +151,24 @@ function Element({
         const ellipseHeight = Math.min(height * 0.3, 20);
         return (
           <>
-            <path 
-              d={`M${x},${y + ellipseHeight / 2} 
-                 C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
-                 L${x + width},${y + height - ellipseHeight / 2}
-                 C${x + width},${y + height + ellipseHeight / 2} ${x},${y + height + ellipseHeight / 2} ${x},${y + height - ellipseHeight / 2}
-                 Z`}
-              fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2"
-            />
-             <ellipse 
-              cx={x + width / 2} 
-              cy={y + ellipseHeight / 2} 
-              rx={width / 2} 
-              ry={ellipseHeight / 2} 
-              fill="hsl(var(--card))" 
-              stroke="hsl(var(--foreground))" 
-              strokeWidth="2"
-            />
-            <g onMouseDown={(e) => onMouseDown(e, element.id)} cursor="move">
+             <g onMouseDown={(e) => onMouseDown(e, element.id)} cursor="move">
+                <path 
+                  d={`M${x},${y + ellipseHeight / 2} 
+                     C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
+                     L${x + width},${y + height - ellipseHeight / 2}
+                     C${x + width},${y + height + ellipseHeight / 2} ${x},${y + height + ellipseHeight / 2} ${x},${y + height - ellipseHeight / 2}
+                     Z`}
+                    {...styleProps}
+                />
+                 <ellipse 
+                  cx={x + width / 2} 
+                  cy={y + ellipseHeight / 2} 
+                  rx={width / 2} 
+                  ry={ellipseHeight / 2} 
+                  {...styleProps}
+                />
                 <rect {...commonProps} fill="transparent" />
-                 <foreignObject {...commonProps}>{textDiv}</foreignObject>
+                <foreignObject {...commonProps}>{textDiv}</foreignObject>
             </g>
           </>
         );
@@ -171,7 +176,7 @@ function Element({
       case 'sticky-note':
         return (
           <>
-            <rect {...commonProps} fill={element.backgroundColor || '#FFF9C4'} stroke="#E0C000" strokeWidth="1" transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={(e) => onMouseDown(e, element.id)} />
             <foreignObject {...commonProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`}>{stickyNoteTextDiv}</foreignObject>
           </>
         );
