@@ -231,6 +231,18 @@ function GhostElement({ element }: { element: DiagramElement | null }) {
     )
 }
 
+function Marquee({ rect }: { rect: { x: number; y: number; width: number; height: number; } | null }) {
+    if (!rect) return null;
+    return (
+        <rect
+            {...rect}
+            fill="hsla(var(--primary), 0.2)"
+            stroke="hsl(var(--primary))"
+            strokeWidth="1"
+        />
+    );
+}
+
 function Connection({ connection, elements }: { connection: DiagramConnection; elements: DiagramElement[] }) {
     const sourceEl = elements.find(el => el.id === connection.source.elementId);
     const targetEl = elements.find(el => el.id === connection.target.elementId);
@@ -251,12 +263,13 @@ interface DiagramViewProps {
   elements: DiagramElement[];
   connections: DiagramConnection[];
   ghostElement: DiagramElement | null;
+  marqueeRect: { x: number; y: number; width: number; height: number; } | null;
   onAddElement: (type: DiagramElement['type']) => void;
   onCanvasMouseDown: (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
-  selectedElementId: string | null;
+  selectedElementIds: string[];
 }
 
-export function DiagramView({ elements, connections, ghostElement, onAddElement, onCanvasMouseDown, selectedElementId }: DiagramViewProps) {
+export function DiagramView({ elements, connections, ghostElement, marqueeRect, onAddElement, onCanvasMouseDown, selectedElementIds }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
       <DiagramToolbar onAddElement={onAddElement} />
@@ -285,14 +298,13 @@ export function DiagramView({ elements, connections, ghostElement, onAddElement,
                     key={el.id} 
                     element={el}
                     onMouseDown={onCanvasMouseDown}
-                    isSelected={el.id === selectedElementId}
+                    isSelected={selectedElementIds.includes(el.id)}
                  />
             ))}
             <GhostElement element={ghostElement} />
+            <Marquee rect={marqueeRect} />
         </g>
       </svg>
     </div>
   );
 }
-
-    

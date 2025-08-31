@@ -9,9 +9,14 @@ import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection } from '@/types';
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'dragging' | 'resizing' | 'creating';
+type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'marquee';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
+interface MarqueeRect { x: number; y: number; width: number; height: number; }
+
+function isIntersecting(a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }) {
+  return !(b.x > a.x + a.width || b.x + b.width < a.x || b.y > a.y + a.height || b.y + b.height < a.y);
+}
 
 export default function Home() {
   const [view, setView] = useState<View>('notepad');
@@ -22,15 +27,13 @@ export default function Home() {
   const { toast } = useToast();
 
   const [action, setAction] = useState<Action>('none');
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
+  const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   
   const initialState = useRef<{
-    elementX: number;
-    elementY: number;
-    elementWidth: number;
-    elementHeight: number;
+    elements?: DiagramElement[];
     mouseX: number;
     mouseY: number;
     sourceElementId?: string;
@@ -63,20 +66,20 @@ export default function Home() {
     }
   }, [notes, elements, connections, isMounted]);
   
-  const handleDeleteElement = useCallback(() => {
-    if (!selectedElementId) return;
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedElementIds.length === 0) return;
 
-    setElements(prev => prev.filter(el => el.id !== selectedElementId));
-    setConnections(prev => prev.filter(conn => conn.source.elementId !== selectedElementId && conn.target.elementId !== selectedElementId));
-    setSelectedElementId(null);
-    toast({ title: 'Element Deleted' });
-  }, [selectedElementId, toast]);
+    setElements(prev => prev.filter(el => !selectedElementIds.includes(el.id)));
+    setConnections(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
+    setSelectedElementIds([]);
+    toast({ title: 'Elements Deleted' });
+  }, [selectedElementIds, toast]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
-            e.preventDefault(); // Prevent browser back navigation on backspace
-            handleDeleteElement();
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0) {
+            e.preventDefault(); 
+            handleDeleteSelected();
         }
     };
 
@@ -85,7 +88,7 @@ export default function Home() {
     return () => {
         window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedElementId, handleDeleteElement]);
+  }, [selectedElementIds, handleDeleteSelected]);
 
 
   const handleAddElement = (type: DiagramElement['type']) => {
@@ -120,7 +123,7 @@ export default function Home() {
   const handleSuggestConnections = useCallback(async () => {
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
     try {
-      const elementIdentifiers = elements.map(el => el.content); // Use content for better suggestions
+      const elementIdentifiers = elements.map(el => el.content); 
       const result = await suggestConnectionsAction({ notes, diagramElements: elementIdentifiers });
       
       if (result.connections.length > 0) {
@@ -153,7 +156,7 @@ export default function Home() {
     a.href = url;
     a.download = 'canvas-notes.md';
     document.body.appendChild(a);
-    a.click();
+a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!', description: 'Your notes have been downloaded as a Markdown file.' });
@@ -183,105 +186,108 @@ export default function Home() {
   }, [toast]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => {
+    const { clientX: mouseX, clientY: mouseY } = e;
+    
     if (elementId) {
         const selectedElement = elements.find(el => el.id === elementId);
         if (!selectedElement) return;
 
-        setSelectedElementId(elementId);
-        const commonState = {
-            elementX: selectedElement.x,
-            elementY: selectedElement.y,
-            elementWidth: selectedElement.width,
-            elementHeight: selectedElement.height,
-            mouseX: e.clientX,
-            mouseY: e.clientY,
-        };
+        const isResizing = handle && !['top', 'right', 'bottom', 'left'].includes(handle);
+        const isCreating = handle && ['top', 'right', 'bottom', 'left'].includes(handle) && !e.altKey;
 
-        if (handle && ['top', 'bottom', 'left', 'right'].includes(handle) && !e.altKey) { // Check if it's an anchor handle
+        if (isCreating) {
             setAction('creating');
-            initialState.current = { ...commonState, sourceElementId: elementId, anchorSide: handle as AnchorSide };
-        } else if (handle) { // It's a resizing handle
+            initialState.current = { mouseX, mouseY, sourceElementId: elementId, anchorSide: handle as AnchorSide };
+        } else if (isResizing) {
             setAction('resizing');
             setResizingHandle(handle as ResizingHandle);
-            initialState.current = commonState;
-        } else { // It's a dragging action
+            setSelectedElementIds([elementId]);
+            initialState.current = { elements: JSON.parse(JSON.stringify(elements)), mouseX, mouseY };
+        } else { // Dragging
             setAction('dragging');
-            initialState.current = commonState;
+            let currentSelectedIds = selectedElementIds;
+            if (e.shiftKey) {
+                currentSelectedIds = selectedElementIds.includes(elementId)
+                    ? selectedElementIds.filter(id => id !== elementId)
+                    : [...selectedElementIds, elementId];
+            } else if (!selectedElementIds.includes(elementId)) {
+                currentSelectedIds = [elementId];
+            }
+            setSelectedElementIds(currentSelectedIds);
+            initialState.current = { elements: JSON.parse(JSON.stringify(elements)), mouseX, mouseY };
         }
-    } else {
-        setSelectedElementId(null);
+
+    } else { // Click on canvas
+        setAction('marquee');
+        setMarqueeRect({ x: mouseX, y: mouseY, width: 0, height: 0 });
+        if (!e.shiftKey) {
+            setSelectedElementIds([]);
+        }
+        initialState.current = { mouseX, mouseY };
     }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
     if (action === 'none') return;
     if (!initialState.current) return;
+    
+    const { clientX, clientY } = e;
+    const dx = clientX - initialState.current.mouseX;
+    const dy = clientY - initialState.current.mouseY;
 
-    const dx = e.clientX - initialState.current.mouseX;
-    const dy = e.clientY - initialState.current.mouseY;
+    if (action === 'marquee') {
+        const { mouseX, mouseY } = initialState.current;
+        const x = Math.min(mouseX, clientX);
+        const y = Math.min(mouseY, clientY);
+        const width = Math.abs(dx);
+        const height = Math.abs(dy);
+        const currentMarqueeRect = { x, y, width, height };
+        setMarqueeRect(currentMarqueeRect);
 
-    if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide) {
-      const { mouseX, mouseY, sourceElementId, anchorSide } = initialState.current;
-      const sourceElement = elements.find(el => el.id === sourceElementId);
-      if (!sourceElement) return;
+        const intersectingIds = elements.filter(el => isIntersecting(el, currentMarqueeRect)).map(el => el.id);
+        setSelectedElementIds(ids => {
+            const baseIds = e.shiftKey ? ids.filter(id => !intersectingIds.includes(id)) : [];
+            return [...new Set([...baseIds, ...intersectingIds])];
+        });
 
+    } else if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide) {
+      const { mouseX, mouseY } = initialState.current;
       const newElement: DiagramElement = {
-        id: 'ghost',
-        type: 'rectangle',
-        content: '',
-        x: e.clientX > mouseX ? mouseX : e.clientX,
-        y: e.clientY > mouseY ? mouseY : e.clientY,
-        width: Math.abs(dx),
-        height: Math.abs(dy),
+        id: 'ghost', type: 'rectangle', content: '',
+        x: clientX > mouseX ? mouseX : clientX,
+        y: clientY > mouseY ? mouseY : clientY,
+        width: Math.abs(dx), height: Math.abs(dy),
       };
-
       setGhostElement(newElement);
 
-    } else if (action === 'dragging' && selectedElementId) {
-        setElements(prevElements =>
-            prevElements.map(el =>
-                el.id === selectedElementId
-                    ? {
-                        ...el,
-                        x: initialState.current!.elementX + dx,
-                        y: initialState.current!.elementY + dy,
-                      }
+    } else if (action === 'dragging' && selectedElementIds.length > 0) {
+        setElements(
+            initialState.current.elements!.map(el =>
+                selectedElementIds.includes(el.id)
+                    ? { ...el, x: el.x + dx, y: el.y + dy, }
                     : el
             )
         );
-    } else if (action === 'resizing' && selectedElementId && resizingHandle) {
+    } else if (action === 'resizing' && selectedElementIds.length === 1 && resizingHandle) {
+        const elementId = selectedElementIds[0];
         setElements(prevElements =>
             prevElements.map(el => {
-                if (el.id === selectedElementId) {
-                    const { elementX, elementY, elementWidth, elementHeight } = initialState.current!;
-                    let { x, y, width, height } = el;
+                if (el.id === elementId) {
+                    const originalElement = initialState.current!.elements!.find(iel => iel.id === elementId)!;
+                    let { x, y, width, height } = originalElement;
                     const minSize = 20;
 
-                    if (resizingHandle.includes('bottom')) {
-                        height = Math.max(minSize, elementHeight + dy);
-                    }
+                    if (resizingHandle.includes('bottom')) { width = Math.max(minSize, originalElement.width + dy); }
                     if (resizingHandle.includes('top')) {
-                        const newHeight = elementHeight - dy;
-                        if (newHeight > minSize) {
-                            y = elementY + dy;
-                            height = newHeight;
-                        } else {
-                            height = minSize;
-                            y = elementY + elementHeight - minSize;
-                        }
+                        const newHeight = originalElement.height - dy;
+                        height = newHeight > minSize ? newHeight : minSize;
+                        y = newHeight > minSize ? originalElement.y + dy : originalElement.y + originalElement.height - minSize;
                     }
-                    if (resizingHandle.includes('right')) {
-                        width = Math.max(minSize, elementWidth + dx);
-                    }
+                    if (resizingHandle.includes('right')) { width = Math.max(minSize, originalElement.width + dx); }
                     if (resizingHandle.includes('left')) {
-                        const newWidth = elementWidth - dx;
-                        if (newWidth > minSize) {
-                            x = elementX + dx;
-                            width = newWidth;
-                        } else {
-                            width = minSize;
-                            x = elementX + elementWidth - minSize;
-                        }
+                        const newWidth = originalElement.width - dx;
+                        width = newWidth > minSize ? newWidth : minSize;
+                        x = newWidth > minSize ? originalElement.x + dx : originalElement.x + originalElement.width - minSize;
                     }
                     return { ...el, x, y, width, height };
                 }
@@ -310,6 +316,7 @@ export default function Home() {
     setAction('none');
     setResizingHandle(null);
     setGhostElement(null);
+    setMarqueeRect(null);
     initialState.current = null;
   };
   
@@ -335,9 +342,10 @@ export default function Home() {
                 elements={elements} 
                 connections={connections} 
                 ghostElement={ghostElement}
+                marqueeRect={marqueeRect}
                 onAddElement={handleAddElement}
                 onCanvasMouseDown={handleCanvasMouseDown}
-                selectedElementId={selectedElementId}
+                selectedElementIds={selectedElementIds}
             />
           </div>
       </div>
