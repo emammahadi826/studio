@@ -236,7 +236,7 @@ function Element({
               y={handle.y}
               width={handleSize}
               height={handleSize}
-              fill="hsl(var(--background))"
+              fill="hsla(var(--background), 0.5)"
               stroke="hsl(var(--primary))"
               strokeWidth="1"
               cursor={handle.cursor}

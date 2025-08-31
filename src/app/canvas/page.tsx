@@ -250,7 +250,7 @@ export default function CanvasPage() {
     const canvasCoords = screenToCanvas(mouseX, mouseY);
     initialState.current = { mouseX, mouseY, initialTransform: { ...transform } };
 
-    if (e.button === 1 || e.metaKey || e.ctrlKey) { // Pan with middle mouse or cmd/ctrl + click
+    if (e.button === 1 || e.metaKey || e.ctrlKey) { 
       setAction('panning');
       return;
     }
@@ -285,7 +285,7 @@ export default function CanvasPage() {
             setResizingHandle(handle as ResizingHandle);
             setSelectedElementIds([elementId]);
             initialState.current.elements = JSON.parse(JSON.stringify(elements));
-        } else { // Dragging
+        } else { 
             setAction('dragging');
             let currentSelectedIds = selectedElementIds;
             if (e.shiftKey) {
@@ -299,7 +299,7 @@ export default function CanvasPage() {
             initialState.current.elements = JSON.parse(JSON.stringify(elements));
         }
 
-    } else { // Click on canvas
+    } else { 
         setAction('marquee');
         setMarqueeRect({ x: canvasCoords.x, y: canvasCoords.y, width: 0, height: 0 });
         if (!e.shiftKey) {
@@ -320,8 +320,8 @@ export default function CanvasPage() {
         if (!canvasContainerRef.current || initialState.current.toolbarX === undefined || initialState.current.toolbarY === undefined) return;
         
         const containerRect = canvasContainerRef.current.getBoundingClientRect();
-        const toolbarWidth = 52; // approx width
-        const toolbarHeight = 316; // approx height
+        const toolbarWidth = 52; 
+        const toolbarHeight = 316; 
 
         let newX = initialState.current.toolbarX + dx;
         let newY = initialState.current.toolbarY + dy;
@@ -364,7 +364,7 @@ export default function CanvasPage() {
         };
         setGhostElement(newElement);
 
-    } else if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide && ghostElement) {
+    } else if (action === 'creating' && initialState.current.sourceElementId && ghostElement) {
       if (!initialState.current) return;
       const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
       const newElement: DiagramElement = {
@@ -458,7 +458,7 @@ export default function CanvasPage() {
   };
 
   const handleElementDoubleClick = (elementId: string) => {
-    cancelEditing(); // Save any pending edits
+    cancelEditing(); 
     setAction('editing');
     setEditingElementId(elementId);
     setSelectedElementIds([elementId]);
@@ -477,17 +477,32 @@ export default function CanvasPage() {
   
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const { clientX, clientY, deltaY } = e;
-    const zoomFactor = 0.05;
-    const newScale = Math.max(0.1, Math.min(5, transform.scale * (1 - deltaY * zoomFactor)));
-    
-    const mouseX = clientX - (canvasContainerRef.current?.getBoundingClientRect().left ?? 0);
-    const mouseY = clientY - (canvasContainerRef.current?.getBoundingClientRect().top ?? 0);
-    
-    const newDx = mouseX - (mouseX - transform.dx) * (newScale / transform.scale);
-    const newDy = mouseY - (mouseY - transform.dy) * (newScale / transform.scale);
-    
-    setTransform({ scale: newScale, dx: newDx, dy: newDy });
+    if (e.ctrlKey) {
+        const { clientX, clientY, deltaY } = e;
+        const zoomFactor = 0.05;
+        
+        setTransform(prevTransform => {
+            const newScale = Math.max(0.1, Math.min(5, prevTransform.scale * (1 - deltaY * zoomFactor)));
+        
+            const containerRect = canvasContainerRef.current?.getBoundingClientRect();
+            if (!containerRect) return prevTransform;
+        
+            const mouseX = clientX - containerRect.left;
+            const mouseY = clientY - containerRect.top;
+            
+            const newDx = mouseX - (mouseX - prevTransform.dx) * (newScale / prevTransform.scale);
+            const newDy = mouseY - (mouseY - prevTransform.dy) * (newScale / prevTransform.scale);
+        
+            return { scale: newScale, dx: newDx, dy: newDy };
+        });
+    } else {
+        const { deltaX, deltaY } = e;
+        setTransform(prevTransform => ({
+            ...prevTransform,
+            dx: prevTransform.dx - deltaX,
+            dy: prevTransform.dy - deltaY,
+        }));
+    }
   };
 
 
