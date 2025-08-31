@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -7,6 +8,7 @@ import { DiagramView } from '@/components/diagram-view';
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection } from '@/types';
+import { useSidebar } from '@/components/ui/sidebar';
 
 export type View = 'notepad' | 'diagram';
 type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee';
@@ -25,6 +27,8 @@ export default function CanvasPage() {
   const [connections, setConnections] = useState<DiagramConnection[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+  const { state, isMobile } = useSidebar();
+
 
   const [action, setAction] = useState<Action>('none');
   const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
@@ -352,6 +356,8 @@ a.click();
     setMarqueeRect(null);
     initialState.current = null;
   };
+
+  const paddingTop = '57px';
   
   return (
     <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
@@ -366,26 +372,34 @@ a.click();
         canSuggestConnections={elements.length >= 2}
         canGenerateDiagram={notes.trim().length > 0}
       />
-      <div className="flex-grow pt-[57px] relative">
+      <div 
+        className="flex-grow relative"
+        style={{ paddingTop }}
+      >
           <div className={`w-full h-full transition-opacity duration-300 ease-in-out ${view === 'notepad' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <NotepadView content={notes} onContentChange={setNotes} />
           </div>
           <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            style={{ top: paddingTop }}
             onMouseMove={handleCanvasMouseMove} 
             onMouseUp={handleCanvasMouseUp} 
-            onMouseLeave={handleCanvasMouseUp}
-            style={{ cursor: activeTool ? 'crosshair' : 'default' }}
+            onMouseLeave={handleCanvasMouseUp} 
           >
-            <DiagramView 
-                elements={elements} 
-                connections={connections} 
-                ghostElement={ghostElement}
-                marqueeRect={marqueeRect}
-                onToolSelect={handleToolSelect}
-                onCanvasMouseDown={handleCanvasMouseDown}
-                selectedElementIds={selectedElementIds}
-                activeTool={activeTool}
-            />
+            <div 
+              className="w-full h-full"
+              style={{ cursor: activeTool ? 'crosshair' : 'default' }}
+            >
+              <DiagramView 
+                  elements={elements} 
+                  connections={connections} 
+                  ghostElement={ghostElement}
+                  marqueeRect={marqueeRect}
+                  onToolSelect={handleToolSelect}
+                  onCanvasMouseDown={handleCanvasMouseDown}
+                  selectedElementIds={selectedElementIds}
+                  activeTool={activeTool}
+              />
+            </div>
           </div>
       </div>
     </main>
