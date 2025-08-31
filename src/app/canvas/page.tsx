@@ -54,27 +54,30 @@ export default function CanvasPage() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setIsMounted(true);
     try {
       const savedNotes = localStorage.getItem('canvasnote-notes');
       const savedElements = localStorage.getItem('canvasnote-elements');
       const savedConnections = localStorage.getItem('canvasnote-connections');
       const savedToolbarPos = localStorage.getItem('canvasnote-toolbar-pos');
       const savedTransform = localStorage.getItem('canvasnote-transform');
+      
       if (savedNotes) setNotes(JSON.parse(savedNotes));
       if (savedElements) setElements(JSON.parse(savedElements));
       if (savedConnections) setConnections(JSON.parse(savedConnections));
+      
       if (savedToolbarPos) {
         setToolbarPosition(JSON.parse(savedToolbarPos));
       } else if(canvasContainerRef.current) {
         setToolbarPosition({ x: 16, y: canvasContainerRef.current.clientHeight / 2 - 150 });
       }
+      
       if (savedTransform) setTransform(JSON.parse(savedTransform));
 
     } catch (error) {
       console.error("Failed to load from localStorage", error);
       toast({ variant: "destructive", title: "Error", description: "Could not load saved data." });
     }
-    setIsMounted(true);
   }, [toast]);
 
   useEffect(() => {
@@ -494,7 +497,7 @@ export default function CanvasPage() {
     e.preventDefault();
     if (e.ctrlKey || e.shiftKey) { // Pinch-to-zoom on trackpads OR Ctrl+Scroll
         const { clientX, clientY, deltaY } = e;
-        const zoomFactor = 0.001;
+        const zoomFactor = 0.0005;
         
         setTransform(prevTransform => {
             const newScale = Math.max(0.1, Math.min(5, prevTransform.scale * (1 - deltaY * zoomFactor)));
@@ -627,3 +630,5 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    

@@ -11,13 +11,15 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  useSidebar
 } from "@/components/ui/sidebar";
 
 export function MainSidebar() {
   const pathname = usePathname();
+  const { state } = useSidebar();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible={state === "collapsed" ? "icon" : "offcanvas"}>
       <SidebarHeader>
         <div className="flex items-center justify-between p-2">
            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">CanvasNote</h1>
@@ -45,3 +47,5 @@ export function MainSidebar() {
     </Sidebar>
   );
 }
+
+    
