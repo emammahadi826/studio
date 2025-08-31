@@ -65,7 +65,7 @@ function Element({
   };
   
   const styleProps = {
-    fill: isSelected ? 'transparent' : (element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'hsl(var(--card))'),
+    fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'hsl(var(--card))',
     stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
     cursor: 'move',
@@ -103,7 +103,7 @@ function Element({
     { position: 'right', cursor: 'ew-resize', x: element.x + element.width - handleSize/2, y: element.y + element.height / 2 - handleSize / 2 },
   ];
 
-  const anchorSize = 16;
+  const anchorSize = 10;
   const anchors: { side: AnchorSide, x: number, y: number }[] = [
       { side: 'top', x: element.x + element.width / 2 - anchorSize/2, y: element.y - anchorSize/2 },
       { side: 'right', x: element.x + element.width - anchorSize/2, y: element.y + element.height/2 - anchorSize/2 },
@@ -192,6 +192,16 @@ function Element({
   return (
     <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       {renderElement()}
+      {isSelected && (
+          <rect
+              {...commonProps}
+              fill="transparent"
+              stroke="hsl(var(--primary))"
+              strokeWidth="2"
+              rx="8" ry="8"
+              style={{ pointerEvents: 'none' }}
+            />
+      )}
       {isSelected && handles.map(handle => (
           <rect
               key={handle.position}
@@ -199,25 +209,35 @@ function Element({
               y={handle.y}
               width={handleSize}
               height={handleSize}
-              fill="hsl(var(--primary))"
-              stroke="hsl(var(--primary-foreground))"
+              fill="transparent"
+              stroke="hsl(var(--primary))"
               strokeWidth="1"
               cursor={handle.cursor}
               onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
           />
       ))}
-      {isHovered && !isSelected && anchors.map(anchor => (
+      {(isHovered || isSelected) && anchors.map(anchor => (
          <g key={anchor.side} onMouseDown={(e) => onMouseDown(e, element.id, anchor.side)} cursor="crosshair">
             <rect
                 x={anchor.x}
                 y={anchor.y}
                 width={anchorSize}
                 height={anchorSize}
-                rx="4"
-                ry="4"
+                rx="2"
+                ry="2"
                 fill="hsl(var(--primary))"
                 stroke="hsl(var(--primary-foreground))"
                 strokeWidth="1"
+            />
+             <line 
+                x1={anchor.x + 2} y1={anchor.y + anchorSize / 2}
+                x2={anchor.x + anchorSize - 2} y2={anchor.y + anchorSize / 2}
+                stroke="hsl(var(--primary-foreground))" strokeWidth="1.5"
+            />
+            <line 
+                x1={anchor.x + anchorSize / 2} y1={anchor.y + 2}
+                x2={anchor.x + anchorSize / 2} y2={anchor.y + anchorSize - 2}
+                stroke="hsl(var(--primary-foreground))" strokeWidth="1.5"
             />
          </g>
       ))}
