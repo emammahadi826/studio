@@ -156,7 +156,7 @@ export default function Home() {
           <div className={`w-full h-full transition-opacity duration-300 ease-in-out ${view === 'notepad' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <NotepadView content={notes} onContentChange={setNotes} />
           </div>
-          <div className={`absolute inset-0 pt-[57px] -mt-[57px] transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <DiagramView elements={elements} connections={connections} onAddElement={handleAddElement} />
           </div>
       </div>
