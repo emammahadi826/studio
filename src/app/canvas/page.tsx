@@ -492,7 +492,7 @@ export default function CanvasPage() {
   
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    if (e.ctrlKey) { // Pinch-to-zoom on trackpads OR Ctrl+Scroll
+    if (e.ctrlKey || e.shiftKey) { // Pinch-to-zoom on trackpads OR Ctrl+Scroll
         const { clientX, clientY, deltaY } = e;
         const zoomFactor = 0.05;
         
