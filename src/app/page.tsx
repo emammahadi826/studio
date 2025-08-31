@@ -9,6 +9,8 @@ import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection } from '@/types';
 
 export type View = 'notepad' | 'diagram';
+type Action = 'none' | 'dragging' | 'resizing';
+type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 
 export default function Home() {
   const [view, setView] = useState<View>('notepad');
@@ -17,6 +19,11 @@ export default function Home() {
   const [connections, setConnections] = useState<DiagramConnection[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+
+  const [action, setAction] = useState<Action>('none');
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
+  const [initialMousePosition, setInitialMousePosition] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -123,7 +130,6 @@ export default function Home() {
     }
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(svgElement);
-    // Add styles for external fonts
     const styleEl = `<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&amp;display=swap');</style>`;
     svgString = svgString.replace(/<defs>/, `<defs>${styleEl}`);
 
@@ -138,9 +144,77 @@ export default function Home() {
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!', description: 'Your diagram has been downloaded as an SVG file.' });
   }, [toast]);
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle) => {
+    e.preventDefault();
+    if (elementId) {
+      setSelectedElementId(elementId);
+      setInitialMousePosition({ x: e.clientX, y: e.clientY });
+      if (handle) {
+        setAction('resizing');
+        setResizingHandle(handle);
+      } else {
+        setAction('dragging');
+      }
+    } else {
+      setSelectedElementId(null);
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (action === 'none' || !initialMousePosition || !selectedElementId) return;
+
+    const dx = e.clientX - initialMousePosition.x;
+    const dy = e.clientY - initialMousePosition.y;
+
+    setElements(prevElements =>
+      prevElements.map(el => {
+        if (el.id === selectedElementId) {
+          const originalElement = prevElements.find(pEl => pEl.id === selectedElementId)!;
+          if (action === 'dragging') {
+            return { ...el, x: el.x + dx, y: el.y + dy };
+          } else if (action === 'resizing' && resizingHandle) {
+            let { x, y, width, height } = el;
+            const minSize = 20;
+
+            if (resizingHandle.includes('bottom')) {
+                height = Math.max(minSize, el.height + dy);
+            }
+            if (resizingHandle.includes('top')) {
+                const newHeight = Math.max(minSize, el.height - dy);
+                if (newHeight > minSize) {
+                    y = el.y + dy;
+                    height = newHeight;
+                }
+            }
+            if (resizingHandle.includes('right')) {
+                width = Math.max(minSize, el.width + dx);
+            }
+            if (resizingHandle.includes('left')) {
+                const newWidth = Math.max(minSize, el.width - dx);
+                if (newWidth > minSize) {
+                    x = el.x + dx;
+                    width = newWidth;
+                }
+            }
+            return { ...el, x, y, width, height };
+          }
+        }
+        return el;
+      })
+    );
+    setInitialMousePosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleCanvasMouseUp = () => {
+    setAction('none');
+    setResizingHandle(null);
+    setInitialMousePosition(null);
+    // Don't reset selectedElementId here, so we can show handles on the selected element
+  };
   
   return (
-    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
+    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col" onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp}>
       <CanvasHeader
         view={view}
         onViewChange={setView}
@@ -157,7 +231,13 @@ export default function Home() {
             <NotepadView content={notes} onContentChange={setNotes} />
           </div>
           <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <DiagramView elements={elements} connections={connections} onAddElement={handleAddElement} />
+            <DiagramView 
+                elements={elements} 
+                connections={connections} 
+                onAddElement={handleAddElement}
+                onCanvasMouseDown={handleCanvasMouseDown}
+                selectedElementId={selectedElementId}
+            />
           </div>
       </div>
     </main>
