@@ -24,6 +24,26 @@ export default function RootLayout({
     setIsMounted(true);
   }, []);
 
+  if (!isMounted) {
+    return (
+        <html lang="en" className="dark">
+            <head>
+                <title>CanvasNote</title>
+                <meta name="description" content="A unified workspace for notes and diagrams, powered by AI." />
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
+            </head>
+            <body className="font-body antialiased">
+                <div className="flex w-full h-screen items-center justify-center">
+                    {/* You can add a loader here */}
+                </div>
+                <Toaster />
+            </body>
+        </html>
+    );
+  }
+
   return (
     <html lang="en" className="dark">
       <head>
@@ -35,23 +55,15 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <SidebarProvider>
-          {isMounted ? (
-            <>
-              <MainSidebar />
-              <SidebarInset>
-                  <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
-                    <SidebarTrigger />
-                  </header>
-                  <main className="flex-1">
-                      {children}
-                  </main>
-              </SidebarInset>
-            </>
-          ) : (
-            <div className="flex w-full h-screen items-center justify-center">
-              {/* You can add a loader here */}
-            </div>
-          )}
+          <MainSidebar />
+          <SidebarInset>
+              <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
+                <SidebarTrigger />
+              </header>
+              <main className="flex-1">
+                  {children}
+              </main>
+          </SidebarInset>
         </SidebarProvider>
         <Toaster />
       </body>
