@@ -73,8 +73,7 @@ export default function Home() {
     setElements(prev => prev.filter(el => !selectedElementIds.includes(el.id)));
     setConnections(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
     setSelectedElementIds([]);
-    toast({ title: 'Elements Deleted' });
-  }, [selectedElementIds, toast]);
+  }, [selectedElementIds]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
