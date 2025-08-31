@@ -11,7 +11,7 @@ import type { DiagramElement, DiagramConnection } from '@/types';
 import { useSidebar } from '@/components/ui/sidebar';
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
+type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
@@ -38,6 +38,7 @@ export default function CanvasPage() {
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 16, y: 16 });
+  const [transform, setTransform] = useState({ scale: 1, dx: 0, dy: 0 });
   
   const initialState = useRef<{
     elements?: DiagramElement[];
@@ -47,6 +48,7 @@ export default function CanvasPage() {
     anchorSide?: AnchorSide;
     toolbarX?: number;
     toolbarY?: number;
+    initialTransform?: { scale: number, dx: number, dy: number };
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +92,8 @@ export default function CanvasPage() {
     setElements(prev => prev.filter(el => !selectedElementIds.includes(el.id)));
     setConnections(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
     setSelectedElementIds([]);
-  }, [selectedElementIds]);
+    toast({ title: 'Elements Deleted', duration: 2000 });
+  }, [selectedElementIds, toast]);
 
   const cancelEditing = useCallback(() => {
     if (editingElementId && textareaRef.current) {
@@ -133,6 +136,12 @@ export default function CanvasPage() {
     }
   }, [action, editingElementId]);
 
+  const screenToCanvas = (x: number, y: number) => {
+    return {
+      x: (x - transform.dx) / transform.scale,
+      y: (y - transform.dy) / transform.scale
+    };
+  };
 
   const handleToolSelect = (type: DiagramElement['type']) => {
     setActiveTool(type);
@@ -189,7 +198,7 @@ export default function CanvasPage() {
     a.href = url;
     a.download = 'canvas-notes.md';
     document.body.appendChild(a);
-a.click();
+    a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!', description: 'Your notes have been downloaded as a Markdown file.' });
@@ -234,16 +243,23 @@ a.click();
       return;
     }
     const { clientX: mouseX, clientY: mouseY } = e;
+    const canvasCoords = screenToCanvas(mouseX, mouseY);
+    initialState.current = { mouseX, mouseY };
 
+    if (e.button === 1 || e.metaKey || e.ctrlKey) { // Pan with middle mouse or cmd/ctrl + click
+      setAction('panning');
+      initialState.current.initialTransform = { ...transform };
+      return;
+    }
+    
     if (activeTool) {
       setAction('creatingShape');
-      initialState.current = { mouseX, mouseY };
       setGhostElement({
         id: 'ghost',
         type: activeTool,
         content: '',
-        x: mouseX,
-        y: mouseY,
+        x: canvasCoords.x,
+        y: canvasCoords.y,
         width: 0,
         height: 0,
       });
@@ -259,12 +275,13 @@ a.click();
 
         if (isCreating) {
             setAction('creating');
-            initialState.current = { mouseX, mouseY, sourceElementId: elementId, anchorSide: handle as AnchorSide };
+            initialState.current.sourceElementId = elementId;
+            initialState.current.anchorSide = handle as AnchorSide;
         } else if (isResizing) {
             setAction('resizing');
             setResizingHandle(handle as ResizingHandle);
             setSelectedElementIds([elementId]);
-            initialState.current = { elements: JSON.parse(JSON.stringify(elements)), mouseX, mouseY };
+            initialState.current.elements = JSON.parse(JSON.stringify(elements));
         } else { // Dragging
             setAction('dragging');
             let currentSelectedIds = selectedElementIds;
@@ -276,29 +293,28 @@ a.click();
                 currentSelectedIds = [elementId];
             }
             setSelectedElementIds(currentSelectedIds);
-            initialState.current = { elements: JSON.parse(JSON.stringify(elements)), mouseX, mouseY };
+            initialState.current.elements = JSON.parse(JSON.stringify(elements));
         }
 
     } else { // Click on canvas
         setAction('marquee');
-        setMarqueeRect({ x: mouseX, y: mouseY, width: 0, height: 0 });
+        setMarqueeRect({ x: canvasCoords.x, y: canvasCoords.y, width: 0, height: 0 });
         if (!e.shiftKey) {
             setSelectedElementIds([]);
         }
-        initialState.current = { mouseX, mouseY };
     }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (action === 'none' || action === 'editing') return;
-    if (!initialState.current) return;
+    if (action === 'none' || action === 'editing' || !initialState.current) return;
     
     const { clientX, clientY } = e;
     const dx = clientX - initialState.current.mouseX;
     const dy = clientY - initialState.current.mouseY;
+    const canvasCoords = screenToCanvas(clientX, clientY);
 
     if (action === 'draggingToolbar') {
-        if (!canvasContainerRef.current || !initialState.current.toolbarX || !initialState.current.toolbarY) return;
+        if (!canvasContainerRef.current || initialState.current.toolbarX === undefined || initialState.current.toolbarY === undefined) return;
         
         const containerRect = canvasContainerRef.current.getBoundingClientRect();
         const toolbarWidth = 52; // approx width
@@ -311,13 +327,19 @@ a.click();
         newY = Math.max(0, Math.min(newY, containerRect.height - toolbarHeight));
 
         setToolbarPosition({ x: newX, y: newY });
-    } else if (action === 'marquee') {
+    } else if (action === 'panning' && initialState.current.initialTransform) {
+        setTransform(t => ({
+          ...t,
+          dx: initialState.current!.initialTransform!.dx + dx,
+          dy: initialState.current!.initialTransform!.dy + dy,
+        }));
+    } else if (action === 'marquee' && marqueeRect) {
         if (!initialState.current) return;
-        const { mouseX, mouseY } = initialState.current;
-        const x = Math.min(mouseX, clientX);
-        const y = Math.min(mouseY, clientY);
-        const width = Math.abs(dx);
-        const height = Math.abs(dy);
+        const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
+        const x = Math.min(startCoords.x, canvasCoords.x);
+        const y = Math.min(startCoords.y, canvasCoords.y);
+        const width = Math.abs(canvasCoords.x - startCoords.x);
+        const height = Math.abs(canvasCoords.y - startCoords.y);
         const currentMarqueeRect = { x, y, width, height };
         setMarqueeRect(currentMarqueeRect);
 
@@ -327,25 +349,27 @@ a.click();
             return [...new Set([...baseIds, ...intersectingIds])];
         });
 
-    } else if (action === 'creatingShape' && activeTool) {
+    } else if (action === 'creatingShape' && activeTool && ghostElement) {
         if (!initialState.current) return;
-        const { mouseX, mouseY } = initialState.current;
+        const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
         const newElement: DiagramElement = {
-            id: 'ghost', type: activeTool, content: '',
-            x: clientX > mouseX ? mouseX : clientX,
-            y: clientY > mouseY ? mouseY : clientY,
-            width: Math.abs(dx), height: Math.abs(dy),
+            ...ghostElement,
+            x: Math.min(startCoords.x, canvasCoords.x),
+            y: Math.min(startCoords.y, canvasCoords.y),
+            width: Math.abs(canvasCoords.x - startCoords.x), 
+            height: Math.abs(canvasCoords.y - startCoords.y),
         };
         setGhostElement(newElement);
 
-    } else if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide) {
+    } else if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide && ghostElement) {
       if (!initialState.current) return;
-      const { mouseX, mouseY } = initialState.current;
+      const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
       const newElement: DiagramElement = {
-        id: 'ghost', type: 'rectangle', content: '',
-        x: clientX > mouseX ? mouseX : clientX,
-        y: clientY > mouseY ? mouseY : clientY,
-        width: Math.abs(dx), height: Math.abs(dy),
+        ...ghostElement,
+        x: Math.min(startCoords.x, canvasCoords.x),
+        y: Math.min(startCoords.y, canvasCoords.y),
+        width: Math.abs(canvasCoords.x - startCoords.x), 
+        height: Math.abs(canvasCoords.y - startCoords.y),
       };
       setGhostElement(newElement);
 
@@ -353,7 +377,7 @@ a.click();
         setElements(
             initialState.current.elements!.map(el =>
                 selectedElementIds.includes(el.id)
-                    ? { ...el, x: el.x + dx, y: el.y + dy, }
+                    ? { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale, }
                     : el
             )
         );
@@ -366,17 +390,17 @@ a.click();
                     let { x, y, width, height } = originalElement;
                     const minSize = 20;
 
-                    if (resizingHandle.includes('bottom')) { height = Math.max(minSize, originalElement.height + dy); }
+                    if (resizingHandle.includes('bottom')) { height = Math.max(minSize, originalElement.height + dy / transform.scale); }
                     if (resizingHandle.includes('top')) {
-                        const newHeight = originalElement.height - dy;
+                        const newHeight = originalElement.height - dy / transform.scale;
                         height = newHeight > minSize ? newHeight : minSize;
-                        y = newHeight > minSize ? originalElement.y + dy : originalElement.y + originalElement.height - minSize;
+                        y = newHeight > minSize ? originalElement.y + dy / transform.scale : originalElement.y + originalElement.height - minSize;
                     }
-                    if (resizingHandle.includes('right')) { width = Math.max(minSize, originalElement.width + dx); }
+                    if (resizingHandle.includes('right')) { width = Math.max(minSize, originalElement.width + dx / transform.scale); }
                     if (resizingHandle.includes('left')) {
-                        const newWidth = originalElement.width - dx;
+                        const newWidth = originalElement.width - dx / transform.scale;
                         width = newWidth > minSize ? newWidth : minSize;
-                        x = newWidth > minSize ? originalElement.x + dx : originalElement.x + originalElement.width - minSize;
+                        x = newWidth > minSize ? originalElement.x + dx / transform.scale : originalElement.x + originalElement.width - minSize;
                     }
                     return { ...el, x, y, width, height };
                 }
@@ -447,6 +471,21 @@ a.click();
     const newContent = e.target.value;
     setElements(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
   };
+  
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const { clientX, clientY, deltaY } = e;
+    const zoomFactor = 0.05;
+    const newScale = Math.max(0.1, Math.min(5, transform.scale * (1 - deltaY * zoomFactor)));
+    
+    const mouseX = clientX - (canvasContainerRef.current?.getBoundingClientRect().left ?? 0);
+    const mouseY = clientY - (canvasContainerRef.current?.getBoundingClientRect().top ?? 0);
+    
+    const newDx = mouseX - (mouseX - transform.dx) * (newScale / transform.scale);
+    const newDy = mouseY - (mouseY - transform.dy) * (newScale / transform.scale);
+    
+    setTransform({ scale: newScale, dx: newDx, dy: newDy });
+  };
 
 
   const paddingTop = '57px';
@@ -478,10 +517,11 @@ a.click();
             onMouseUp={handleCanvasMouseUp} 
             onMouseLeave={handleCanvasMouseUp}
             onClick={handleCanvasClick}
+            onWheel={handleWheel}
           >
             <div 
               className="w-full h-full"
-              style={{ cursor: activeTool ? 'crosshair' : 'default' }}
+              style={{ cursor: activeTool ? 'crosshair' : (action === 'panning' ? 'grabbing' : 'default') }}
             >
               <DiagramView 
                   elements={elements} 
@@ -496,12 +536,19 @@ a.click();
                   onElementDoubleClick={handleElementDoubleClick}
                   toolbarPosition={toolbarPosition}
                   onToolbarMouseDown={handleToolbarMouseDown}
+                  transform={transform}
               />
             </div>
              {action === 'editing' && editingElementId && (
                 (() => {
                     const el = elements.find(e => e.id === editingElementId);
                     if (!el) return null;
+                    
+                    const left = transform.dx + el.x * transform.scale;
+                    const top = transform.dy + el.y * transform.scale;
+                    const width = el.width * transform.scale;
+                    const height = el.height * transform.scale;
+                    
                     return (
                         <textarea
                             ref={textareaRef}
@@ -510,10 +557,10 @@ a.click();
                             onBlur={cancelEditing}
                             style={{
                                 position: 'absolute',
-                                left: el.x,
-                                top: el.y,
-                                width: el.width,
-                                height: el.height,
+                                left: left,
+                                top: top,
+                                width: width,
+                                height: height,
                                 background: 'transparent',
                                 border: '2px solid hsl(var(--primary))',
                                 color: 'hsl(var(--foreground))',
@@ -522,10 +569,10 @@ a.click();
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                padding: '8px',
+                                padding: `${8 * transform.scale}px`,
                                 boxSizing: 'border-box',
                                 fontFamily: 'Inter, sans-serif',
-                                fontSize: '14px',
+                                fontSize: `${14 * transform.scale}px`,
                                 zIndex: 100,
                             }}
                         />
@@ -537,3 +584,5 @@ a.click();
     </main>
   );
 }
+
+    

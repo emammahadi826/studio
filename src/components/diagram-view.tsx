@@ -90,7 +90,7 @@ function Element({
   
   const styleProps = {
     fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent',
-    stroke: isSelected ? 'hsl(var(--primary-foreground))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
+    stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
     cursor: 'move',
   };
@@ -385,6 +385,7 @@ interface DiagramViewProps {
   onElementDoubleClick: (elementId: string) => void;
   toolbarPosition: { x: number; y: number; };
   onToolbarMouseDown: (e: React.MouseEvent) => void;
+  transform: { scale: number, dx: number, dy: number };
 }
 
 export function DiagramView({ 
@@ -400,6 +401,7 @@ export function DiagramView({
     onElementDoubleClick,
     toolbarPosition,
     onToolbarMouseDown,
+    transform,
 }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
@@ -425,7 +427,7 @@ export function DiagramView({
             <path d="M0,0 L0,7 L9,3.5 z" fill="hsl(var(--foreground))" />
           </marker>
         </defs>
-        <g>
+        <g transform={`translate(${transform.dx}, ${transform.dy}) scale(${transform.scale})`}>
             {connections.map(conn => (
                 <Connection key={conn.id} connection={conn} elements={elements} />
             ))}
