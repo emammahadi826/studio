@@ -206,7 +206,10 @@ export default function Home() {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (action === 'none' || !initialDragState.current || !selectedElementId) return;
+    if (action === 'none' || !selectedElementId) return;
+    
+    // This check is important to prevent a runtime error if mouse move happens after mouse up but before state has updated.
+    if (!initialDragState.current) return;
 
     const dx = e.clientX - initialDragState.current.mouseX;
     const dy = e.clientY - initialDragState.current.mouseY;
@@ -221,8 +224,8 @@ export default function Home() {
               y: initialDragState.current!.elementY + dy,
             };
           } else if (action === 'resizing' && resizingHandle) {
-            let { x, y, width, height } = initialDragState.current!;
             const { elementX, elementY, elementWidth, elementHeight } = initialDragState.current!;
+            let { x, y, width, height } = el; // Start with current values
             const minSize = 20;
 
             if (resizingHandle.includes('bottom')) {
