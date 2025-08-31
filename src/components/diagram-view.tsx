@@ -236,7 +236,7 @@ function Marquee({ rect }: { rect: { x: number; y: number; width: number; height
     return (
         <rect
             {...rect}
-            fill="hsla(var(--primary), 0.2)"
+            fill="hsla(var(--primary), 0.3)"
             stroke="hsl(var(--primary))"
             strokeWidth="1"
         />
