@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Plus } from 'lucide-react';
+import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DiagramElement, DiagramConnection } from '@/types';
@@ -65,7 +65,7 @@ function Element({
   };
   
   const styleProps = {
-    fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'hsl(var(--card))',
+    fill: isSelected ? 'transparent' : (element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'hsl(var(--card))'),
     stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
     cursor: 'move',
@@ -219,7 +219,6 @@ function Element({
                 stroke="hsl(var(--primary-foreground))"
                 strokeWidth="1"
             />
-             <Plus x={anchor.x + 2} y={anchor.y + 2} size={12} color="hsl(var(--primary-foreground))" />
          </g>
       ))}
     </g>
