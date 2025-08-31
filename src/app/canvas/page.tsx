@@ -11,7 +11,7 @@ import type { DiagramElement, DiagramConnection } from '@/types';
 import { useSidebar } from '@/components/ui/sidebar';
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee';
+type Action = 'none' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
@@ -33,6 +33,7 @@ export default function CanvasPage() {
   const [action, setAction] = useState<Action>('none');
   const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
@@ -44,6 +45,7 @@ export default function CanvasPage() {
     sourceElementId?: string;
     anchorSide?: AnchorSide;
   } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     try {
@@ -79,14 +81,30 @@ export default function CanvasPage() {
     setSelectedElementIds([]);
   }, [selectedElementIds]);
 
+  const cancelEditing = useCallback(() => {
+    if (editingElementId && textareaRef.current) {
+      const newContent = textareaRef.current.value;
+      setElements(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
+    }
+    setEditingElementId(null);
+    setAction('none');
+  }, [editingElementId]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0) {
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0 && action !== 'editing') {
             e.preventDefault(); 
             handleDeleteSelected();
         }
         if (e.key === 'Escape') {
+          if (action === 'editing') {
+            cancelEditing();
+          }
           setActiveTool(null);
+        }
+        if (e.key === 'Enter' && action === 'editing' && !e.shiftKey) {
+            e.preventDefault();
+            cancelEditing();
         }
     };
 
@@ -95,7 +113,14 @@ export default function CanvasPage() {
     return () => {
         window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedElementIds, handleDeleteSelected]);
+  }, [selectedElementIds, handleDeleteSelected, action, cancelEditing]);
+
+  useEffect(() => {
+    if (action === 'editing' && textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.select();
+    }
+  }, [action, editingElementId]);
 
 
   const handleToolSelect = (type: DiagramElement['type']) => {
@@ -183,6 +208,9 @@ a.click();
   }, [toast]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => {
+    if (action === 'editing') {
+      return;
+    }
     const { clientX: mouseX, clientY: mouseY } = e;
 
     if (activeTool) {
@@ -240,7 +268,7 @@ a.click();
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (action === 'none') return;
+    if (action === 'none' || action === 'editing') return;
     if (!initialState.current) return;
     
     const { clientX, clientY } = e;
@@ -332,6 +360,11 @@ a.click();
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
         setElements(prev => [...prev, newElement]);
+        setSelectedElementIds([newElement.id]);
+        setEditingElementId(newElement.id);
+        setAction('editing');
+      } else {
+        setAction('none');
       }
       setActiveTool(null);
     }
@@ -348,14 +381,37 @@ a.click();
 
         setElements(prev => [...prev, finalGhost]);
         setConnections(prev => [...prev, newConnection]);
+        setAction('none');
+    } else {
+        setAction('none');
     }
     
-    setAction('none');
-    setResizingHandle(null);
-    setGhostElement(null);
-    setMarqueeRect(null);
-    initialState.current = null;
+    if (action !== 'editing') {
+      setResizingHandle(null);
+      setGhostElement(null);
+      setMarqueeRect(null);
+      initialState.current = null;
+    }
   };
+
+  const handleElementDoubleClick = (elementId: string) => {
+    cancelEditing(); // Save any pending edits
+    setAction('editing');
+    setEditingElementId(elementId);
+    setSelectedElementIds([elementId]);
+  };
+  
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (action === 'editing' && e.target instanceof SVGElement && e.target.id === 'diagram-canvas') {
+        cancelEditing();
+    }
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setElements(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
+  };
+
 
   const paddingTop = '57px';
   
@@ -383,7 +439,8 @@ a.click();
             style={{ top: paddingTop }}
             onMouseMove={handleCanvasMouseMove} 
             onMouseUp={handleCanvasMouseUp} 
-            onMouseLeave={handleCanvasMouseUp} 
+            onMouseLeave={handleCanvasMouseUp}
+            onClick={handleCanvasClick}
           >
             <div 
               className="w-full h-full"
@@ -398,8 +455,44 @@ a.click();
                   onCanvasMouseDown={handleCanvasMouseDown}
                   selectedElementIds={selectedElementIds}
                   activeTool={activeTool}
+                  editingElementId={editingElementId}
+                  onElementDoubleClick={handleElementDoubleClick}
               />
             </div>
+             {action === 'editing' && editingElementId && (
+                (() => {
+                    const el = elements.find(e => e.id === editingElementId);
+                    if (!el) return null;
+                    return (
+                        <textarea
+                            ref={textareaRef}
+                            value={el.content}
+                            onChange={handleTextareaChange}
+                            onBlur={cancelEditing}
+                            style={{
+                                position: 'absolute',
+                                left: el.x,
+                                top: el.y,
+                                width: el.width,
+                                height: el.height,
+                                background: 'transparent',
+                                border: '2px solid hsl(var(--primary))',
+                                color: 'hsl(var(--foreground))',
+                                resize: 'none',
+                                textAlign: 'center',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '8px',
+                                boxSizing: 'border-box',
+                                fontFamily: 'Inter, sans-serif',
+                                fontSize: '14px',
+                                zIndex: 100,
+                            }}
+                        />
+                    );
+                })()
+            )}
           </div>
       </div>
     </main>

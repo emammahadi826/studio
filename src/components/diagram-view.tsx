@@ -49,11 +49,15 @@ type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 function Element({ 
   element,
   onMouseDown,
+  onDoubleClick,
   isSelected,
+  isEditing,
 }: { 
   element: DiagramElement;
   onMouseDown: (e: React.MouseEvent<any>, elementId: string, handle?: ResizingHandle | AnchorSide) => void;
+  onDoubleClick: (elementId: string) => void;
   isSelected: boolean;
+  isEditing: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -75,7 +79,12 @@ function Element({
     <div 
         xmlns="http://www.w3.org/1999/xhtml" 
         className="flex items-center justify-center h-full text-center p-2 break-words text-sm font-sans"
-        style={{ color: 'hsl(var(--foreground))', fontFamily: 'Inter', pointerEvents: 'none' }}
+        style={{ 
+          color: 'hsl(var(--foreground))', 
+          fontFamily: 'Inter', 
+          pointerEvents: 'none',
+          visibility: isEditing ? 'hidden' : 'visible'
+        }}
     >
         {element.content}
     </div>
@@ -85,7 +94,12 @@ function Element({
       <div 
         xmlns="http://www.w3.org/1999/xhtml" 
         className="flex items-center justify-center h-full text-center p-4 break-words"
-        style={{ color: '#333', fontFamily: 'Inter', pointerEvents: 'none' }}
+        style={{ 
+          color: '#333', 
+          fontFamily: 'Inter', 
+          pointerEvents: 'none',
+          visibility: isEditing ? 'hidden' : 'visible' 
+        }}
     >
         {element.content}
     </div>
@@ -111,19 +125,22 @@ function Element({
       { side: 'left', x: element.x - anchorSize/2, y: element.y + element.height/2 - anchorSize/2 },
   ];
   
+  const handleMouseDown = (e: React.MouseEvent<any>) => onMouseDown(e, element.id)
+  const handleDoubleClick = () => onDoubleClick(element.id)
+
   const renderElement = () => {
     switch (element.type) {
       case 'rectangle':
         return (
           <>
-            <rect {...commonProps} {...styleProps} rx="8" ry="8" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <rect {...commonProps} {...styleProps} rx="8" ry="8" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       case 'circle':
         return (
           <>
-            <ellipse cx={element.x + element.width / 2} cy={element.y + element.height / 2} rx={element.width / 2} ry={element.height / 2} {...styleProps} onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <ellipse cx={element.x + element.width / 2} cy={element.y + element.height / 2} rx={element.width / 2} ry={element.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -132,7 +149,7 @@ function Element({
         const points = `${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}`;
         return (
           <>
-            <polygon points={points} {...styleProps} onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -141,7 +158,7 @@ function Element({
         const points = `${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`;
         return (
           <>
-            <polygon points={points} {...styleProps} onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -151,7 +168,7 @@ function Element({
         const ellipseHeight = Math.min(height * 0.3, 20);
         return (
           <>
-             <g onMouseDown={(e) => onMouseDown(e, element.id)} cursor="move">
+             <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} cursor="move">
                 <path 
                   d={`M${x},${y + ellipseHeight / 2} 
                      C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
@@ -176,13 +193,13 @@ function Element({
       case 'sticky-note':
         return (
           <>
-            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`}>{stickyNoteTextDiv}</foreignObject>
           </>
         );
       case 'text':
         return (
-            <foreignObject {...commonProps} cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)}>{textDiv}</foreignObject>
+            <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>{textDiv}</foreignObject>
         );
       default:
         return null;
@@ -192,7 +209,7 @@ function Element({
   return (
     <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       {renderElement()}
-      {isSelected && (
+      {isSelected && !isEditing && (
           <rect
               {...commonProps}
               fill="transparent"
@@ -202,7 +219,7 @@ function Element({
               style={{ pointerEvents: 'none' }}
             />
       )}
-      {isSelected && handles.map(handle => (
+      {isSelected && !isEditing && handles.map(handle => (
           <rect
               key={handle.position}
               x={handle.x}
@@ -216,7 +233,7 @@ function Element({
               onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
           />
       ))}
-      {(isHovered || isSelected) && anchors.map(anchor => (
+      {(isHovered || isSelected) && !isEditing && anchors.map(anchor => (
          <g key={anchor.side} onMouseDown={(e) => onMouseDown(e, element.id, anchor.side)} cursor="crosshair">
             <rect
                 x={anchor.x}
@@ -228,16 +245,6 @@ function Element({
                 fill="hsl(var(--primary))"
                 stroke="hsl(var(--primary-foreground))"
                 strokeWidth="1"
-            />
-             <line 
-                x1={anchor.x + 2} y1={anchor.y + anchorSize / 2}
-                x2={anchor.x + anchorSize - 2} y2={anchor.y + anchorSize / 2}
-                stroke="hsl(var(--primary-foreground))" strokeWidth="1.5"
-            />
-            <line 
-                x1={anchor.x + anchorSize / 2} y1={anchor.y + 2}
-                x2={anchor.x + anchorSize / 2} y2={anchor.y + anchorSize - 2}
-                stroke="hsl(var(--primary-foreground))" strokeWidth="1.5"
             />
          </g>
       ))}
@@ -354,9 +361,11 @@ interface DiagramViewProps {
   onCanvasMouseDown: (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
   selectedElementIds: string[];
   activeTool: DiagramElement['type'] | null;
+  editingElementId: string | null;
+  onElementDoubleClick: (elementId: string) => void;
 }
 
-export function DiagramView({ elements, connections, ghostElement, marqueeRect, onToolSelect, onCanvasMouseDown, selectedElementIds, activeTool }: DiagramViewProps) {
+export function DiagramView({ elements, connections, ghostElement, marqueeRect, onToolSelect, onCanvasMouseDown, selectedElementIds, activeTool, editingElementId, onElementDoubleClick }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
       <DiagramToolbar onToolSelect={onToolSelect} activeTool={activeTool} />
@@ -385,7 +394,9 @@ export function DiagramView({ elements, connections, ghostElement, marqueeRect, 
                     key={el.id} 
                     element={el}
                     onMouseDown={onCanvasMouseDown}
+                    onDoubleClick={onElementDoubleClick}
                     isSelected={selectedElementIds.includes(el.id)}
+                    isEditing={editingElementId === el.id}
                  />
             ))}
             <GhostElement element={ghostElement} />
