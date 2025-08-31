@@ -1,6 +1,7 @@
 'use client';
 
-import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder } from 'lucide-react';
+import React, { useState } from 'react';
+import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DiagramElement, DiagramConnection } from '@/types';
@@ -37,7 +38,7 @@ function DiagramToolbar({ onAddElement }: { onAddElement: (type: DiagramElement[
 }
 
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
-
+type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 
 function Element({ 
   element,
@@ -45,9 +46,11 @@ function Element({
   isSelected,
 }: { 
   element: DiagramElement;
-  onMouseDown: (e: React.MouseEvent<any>, elementId: string, handle?: ResizingHandle) => void;
+  onMouseDown: (e: React.MouseEvent<any>, elementId: string, handle?: ResizingHandle | AnchorSide) => void;
   isSelected: boolean;
 }) {
+  const [isHovered, setIsHovered] = useState(false);
+  
   const commonProps = {
     x: element.x,
     y: element.y,
@@ -77,14 +80,22 @@ function Element({
 
   const handleSize = 8;
   const handles: { position: ResizingHandle; cursor: string; x: number; y: number }[] = [
-    { position: 'top-left', cursor: 'nwse-resize', x: element.x, y: element.y },
-    { position: 'top-right', cursor: 'nesw-resize', x: element.x + element.width - handleSize, y: element.y },
-    { position: 'bottom-left', cursor: 'nesw-resize', x: element.x, y: element.y + element.height - handleSize },
-    { position: 'bottom-right', cursor: 'nwse-resize', x: element.x + element.width - handleSize, y: element.y + element.height - handleSize },
-    { position: 'top', cursor: 'ns-resize', x: element.x + element.width / 2 - handleSize / 2, y: element.y },
-    { position: 'bottom', cursor: 'ns-resize', x: element.x + element.width / 2 - handleSize / 2, y: element.y + element.height - handleSize },
-    { position: 'left', cursor: 'ew-resize', x: element.x, y: element.y + element.height / 2 - handleSize / 2 },
-    { position: 'right', cursor: 'ew-resize', x: element.x + element.width - handleSize, y: element.y + element.height / 2 - handleSize / 2 },
+    { position: 'top-left', cursor: 'nwse-resize', x: element.x - handleSize/2, y: element.y - handleSize/2 },
+    { position: 'top-right', cursor: 'nesw-resize', x: element.x + element.width - handleSize/2, y: element.y - handleSize/2 },
+    { position: 'bottom-left', cursor: 'nesw-resize', x: element.x - handleSize/2, y: element.y + element.height - handleSize/2 },
+    { position: 'bottom-right', cursor: 'nwse-resize', x: element.x + element.width - handleSize/2, y: element.y + element.height - handleSize/2 },
+    { position: 'top', cursor: 'ns-resize', x: element.x + element.width / 2 - handleSize / 2, y: element.y - handleSize/2 },
+    { position: 'bottom', cursor: 'ns-resize', x: element.x + element.width / 2 - handleSize / 2, y: element.y + element.height - handleSize/2 },
+    { position: 'left', cursor: 'ew-resize', x: element.x - handleSize/2, y: element.y + element.height / 2 - handleSize / 2 },
+    { position: 'right', cursor: 'ew-resize', x: element.x + element.width - handleSize/2, y: element.y + element.height / 2 - handleSize / 2 },
+  ];
+
+  const anchorSize = 16;
+  const anchors: { side: AnchorSide, x: number, y: number }[] = [
+      { side: 'top', x: element.x + element.width / 2 - anchorSize/2, y: element.y - anchorSize/2 },
+      { side: 'right', x: element.x + element.width - anchorSize/2, y: element.y + element.height/2 - anchorSize/2 },
+      { side: 'bottom', x: element.x + element.width / 2 - anchorSize/2, y: element.y + element.height - anchorSize/2 },
+      { side: 'left', x: element.x - anchorSize/2, y: element.y + element.height/2 - anchorSize/2 },
   ];
   
   const renderElement = () => {
@@ -168,24 +179,56 @@ function Element({
   }
 
   return (
-    <g>
-        {renderElement()}
-        {isSelected && handles.map(handle => (
+    <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+      {renderElement()}
+      {isSelected && handles.map(handle => (
+          <rect
+              key={handle.position}
+              x={handle.x}
+              y={handle.y}
+              width={handleSize}
+              height={handleSize}
+              fill="hsl(var(--primary))"
+              stroke="hsl(var(--primary-foreground))"
+              strokeWidth="1"
+              cursor={handle.cursor}
+              onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
+          />
+      ))}
+      {isHovered && !isSelected && anchors.map(anchor => (
+         <g key={anchor.side} onMouseDown={(e) => onMouseDown(e, element.id, anchor.side)} cursor="crosshair">
             <rect
-                key={handle.position}
-                x={handle.x}
-                y={handle.y}
-                width={handleSize}
-                height={handleSize}
+                x={anchor.x}
+                y={anchor.y}
+                width={anchorSize}
+                height={anchorSize}
+                rx="4"
+                ry="4"
                 fill="hsl(var(--primary))"
                 stroke="hsl(var(--primary-foreground))"
                 strokeWidth="1"
-                cursor={handle.cursor}
-                onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
             />
-        ))}
+             <Plus x={anchor.x + 2} y={anchor.y + 2} size={12} color="hsl(var(--primary-foreground))" />
+         </g>
+      ))}
     </g>
   );
+}
+
+function GhostElement({ element }: { element: DiagramElement | null }) {
+    if (!element) return null;
+    return (
+        <rect
+            x={element.x}
+            y={element.y}
+            width={element.width}
+            height={element.height}
+            fill="hsla(var(--primary), 0.2)"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2"
+            strokeDasharray="5 5"
+        />
+    )
 }
 
 function Connection({ connection, elements }: { connection: DiagramConnection; elements: DiagramElement[] }) {
@@ -207,12 +250,13 @@ function Connection({ connection, elements }: { connection: DiagramConnection; e
 interface DiagramViewProps {
   elements: DiagramElement[];
   connections: DiagramConnection[];
+  ghostElement: DiagramElement | null;
   onAddElement: (type: DiagramElement['type']) => void;
-  onCanvasMouseDown: (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle) => void;
+  onCanvasMouseDown: (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
   selectedElementId: string | null;
 }
 
-export function DiagramView({ elements, connections, onAddElement, onCanvasMouseDown, selectedElementId }: DiagramViewProps) {
+export function DiagramView({ elements, connections, ghostElement, onAddElement, onCanvasMouseDown, selectedElementId }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
       <DiagramToolbar onAddElement={onAddElement} />
@@ -244,8 +288,11 @@ export function DiagramView({ elements, connections, onAddElement, onCanvasMouse
                     isSelected={el.id === selectedElementId}
                  />
             ))}
+            <GhostElement element={ghostElement} />
         </g>
       </svg>
     </div>
   );
 }
+
+    

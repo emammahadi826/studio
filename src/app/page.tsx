@@ -9,8 +9,9 @@ import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection } from '@/types';
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'dragging' | 'resizing';
+type Action = 'none' | 'dragging' | 'resizing' | 'creating';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
+type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 
 export default function Home() {
   const [view, setView] = useState<View>('notepad');
@@ -23,15 +24,17 @@ export default function Home() {
   const [action, setAction] = useState<Action>('none');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
+  const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
   
-  // Use a ref for initial position to prevent re-renders on move
-  const initialDragState = useRef<{
+  const initialState = useRef<{
     elementX: number;
     elementY: number;
     elementWidth: number;
     elementHeight: number;
     mouseX: number;
     mouseY: number;
+    sourceElementId?: string;
+    anchorSide?: AnchorSide;
   } | null>(null);
 
   useEffect(() => {
@@ -179,13 +182,13 @@ export default function Home() {
     toast({ title: 'Exported!', description: 'Your diagram has been downloaded as an SVG file.' });
   }, [toast]);
 
-  const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle) => {
+  const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => {
     if (elementId) {
         const selectedElement = elements.find(el => el.id === elementId);
         if (!selectedElement) return;
 
         setSelectedElementId(elementId);
-        initialDragState.current = {
+        const commonState = {
             elementX: selectedElement.x,
             elementY: selectedElement.y,
             elementWidth: selectedElement.width,
@@ -194,11 +197,16 @@ export default function Home() {
             mouseY: e.clientY,
         };
 
-        if (handle) {
+        if (handle && ['top', 'bottom', 'left', 'right'].includes(handle) && !e.altKey) { // Check if it's an anchor handle
+            setAction('creating');
+            initialState.current = { ...commonState, sourceElementId: elementId, anchorSide: handle as AnchorSide };
+        } else if (handle) { // It's a resizing handle
             setAction('resizing');
-            setResizingHandle(handle);
-        } else {
+            setResizingHandle(handle as ResizingHandle);
+            initialState.current = commonState;
+        } else { // It's a dragging action
             setAction('dragging');
+            initialState.current = commonState;
         }
     } else {
         setSelectedElementId(null);
@@ -206,67 +214,103 @@ export default function Home() {
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (action === 'none' || !selectedElementId) return;
-    
-    // This check is important to prevent a runtime error if mouse move happens after mouse up but before state has updated.
-    if (!initialDragState.current) return;
+    if (action === 'none') return;
+    if (!initialState.current) return;
 
-    const dx = e.clientX - initialDragState.current.mouseX;
-    const dy = e.clientY - initialDragState.current.mouseY;
+    const dx = e.clientX - initialState.current.mouseX;
+    const dy = e.clientY - initialState.current.mouseY;
 
-    setElements(prevElements =>
-      prevElements.map(el => {
-        if (el.id === selectedElementId) {
-          if (action === 'dragging') {
-            return {
-              ...el,
-              x: initialDragState.current!.elementX + dx,
-              y: initialDragState.current!.elementY + dy,
-            };
-          } else if (action === 'resizing' && resizingHandle) {
-            const { elementX, elementY, elementWidth, elementHeight } = initialDragState.current!;
-            let { x, y, width, height } = el; // Start with current values
-            const minSize = 20;
+    if (action === 'creating' && initialState.current.sourceElementId && initialState.current.anchorSide) {
+      const { mouseX, mouseY, sourceElementId, anchorSide } = initialState.current;
+      const sourceElement = elements.find(el => el.id === sourceElementId);
+      if (!sourceElement) return;
 
-            if (resizingHandle.includes('bottom')) {
-              height = Math.max(minSize, elementHeight + dy);
-            }
-            if (resizingHandle.includes('top')) {
-              const newHeight = elementHeight - dy;
-              if (newHeight > minSize) {
-                y = elementY + dy;
-                height = newHeight;
-              } else {
-                height = minSize;
-                y = elementY + elementHeight - minSize;
-              }
-            }
-            if (resizingHandle.includes('right')) {
-              width = Math.max(minSize, elementWidth + dx);
-            }
-            if (resizingHandle.includes('left')) {
-              const newWidth = elementWidth - dx;
-              if(newWidth > minSize) {
-                x = elementX + dx;
-                width = newWidth;
-              } else {
-                width = minSize;
-                x = elementX + elementWidth - minSize;
-              }
-            }
-            return { ...el, x, y, width, height };
-          }
-        }
-        return el;
-      })
-    );
+      const newElement: DiagramElement = {
+        id: 'ghost',
+        type: 'rectangle',
+        content: '',
+        x: e.clientX > mouseX ? mouseX : e.clientX,
+        y: e.clientY > mouseY ? mouseY : e.clientY,
+        width: Math.abs(dx),
+        height: Math.abs(dy),
+      };
+
+      setGhostElement(newElement);
+
+    } else if (action === 'dragging' && selectedElementId) {
+        setElements(prevElements =>
+            prevElements.map(el =>
+                el.id === selectedElementId
+                    ? {
+                        ...el,
+                        x: initialState.current!.elementX + dx,
+                        y: initialState.current!.elementY + dy,
+                      }
+                    : el
+            )
+        );
+    } else if (action === 'resizing' && selectedElementId && resizingHandle) {
+        setElements(prevElements =>
+            prevElements.map(el => {
+                if (el.id === selectedElementId) {
+                    const { elementX, elementY, elementWidth, elementHeight } = initialState.current!;
+                    let { x, y, width, height } = el;
+                    const minSize = 20;
+
+                    if (resizingHandle.includes('bottom')) {
+                        height = Math.max(minSize, elementHeight + dy);
+                    }
+                    if (resizingHandle.includes('top')) {
+                        const newHeight = elementHeight - dy;
+                        if (newHeight > minSize) {
+                            y = elementY + dy;
+                            height = newHeight;
+                        } else {
+                            height = minSize;
+                            y = elementY + elementHeight - minSize;
+                        }
+                    }
+                    if (resizingHandle.includes('right')) {
+                        width = Math.max(minSize, elementWidth + dx);
+                    }
+                    if (resizingHandle.includes('left')) {
+                        const newWidth = elementWidth - dx;
+                        if (newWidth > minSize) {
+                            x = elementX + dx;
+                            width = newWidth;
+                        } else {
+                            width = minSize;
+                            x = elementX + elementWidth - minSize;
+                        }
+                    }
+                    return { ...el, x, y, width, height };
+                }
+                return el;
+            })
+        );
+    }
   };
 
-  const handleCanvasMouseUp = () => {
+  const handleCanvasMouseUp = (e: React.MouseEvent) => {
+    if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
+        const sourceElementId = initialState.current.sourceElementId;
+        const newElementId = `el-${Date.now()}`;
+        const finalGhost = { ...ghostElement, id: newElementId, content: 'New rectangle' };
+        
+        const newConnection: DiagramConnection = {
+            id: `conn-${Date.now()}`,
+            source: { elementId: sourceElementId },
+            target: { elementId: newElementId },
+        };
+
+        setElements(prev => [...prev, finalGhost]);
+        setConnections(prev => [...prev, newConnection]);
+    }
+    
     setAction('none');
     setResizingHandle(null);
-    initialDragState.current = null;
-    // Don't reset selectedElementId here, so we can show handles on the selected element
+    setGhostElement(null);
+    initialState.current = null;
   };
   
   return (
@@ -290,6 +334,7 @@ export default function Home() {
             <DiagramView 
                 elements={elements} 
                 connections={connections} 
+                ghostElement={ghostElement}
                 onAddElement={handleAddElement}
                 onCanvasMouseDown={handleCanvasMouseDown}
                 selectedElementId={selectedElementId}
@@ -299,3 +344,5 @@ export default function Home() {
     </main>
   );
 }
+
+    
