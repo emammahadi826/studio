@@ -248,10 +248,11 @@ export default function CanvasPage() {
     }
     const { clientX: mouseX, clientY: mouseY } = e;
     const canvasCoords = screenToCanvas(mouseX, mouseY);
-    initialState.current = { mouseX, mouseY, initialTransform: { ...transform } };
+    initialState.current = { mouseX, mouseY };
 
     if (e.button === 1 || e.metaKey || e.ctrlKey) { 
       setAction('panning');
+      initialState.current.initialTransform = { ...transform };
       return;
     }
     
@@ -602,5 +603,7 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    
 
     
