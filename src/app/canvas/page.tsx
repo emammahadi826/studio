@@ -252,7 +252,10 @@ export default function CanvasPage() {
 
     if (e.button === 1 || e.metaKey || e.ctrlKey) { 
       setAction('panning');
-      initialState.current.initialTransform = { ...transform };
+      initialState.current = { 
+        ...initialState.current, 
+        initialTransform: { ...transform } 
+      };
       return;
     }
     
@@ -603,7 +606,3 @@ export default function CanvasPage() {
     </main>
   );
 }
-
-    
-
-    
