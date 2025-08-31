@@ -248,17 +248,20 @@ export default function CanvasPage() {
     }
     const { clientX: mouseX, clientY: mouseY } = e;
     const canvasCoords = screenToCanvas(mouseX, mouseY);
-    initialState.current = { mouseX, mouseY };
 
     if (e.button === 1 || e.metaKey || e.ctrlKey) { 
+      e.preventDefault();
       setAction('panning');
       initialState.current = { 
-        ...initialState.current, 
+        mouseX, 
+        mouseY,
         initialTransform: { ...transform } 
       };
       return;
     }
     
+    initialState.current = { mouseX, mouseY };
+
     if (activeTool) {
       setAction('creatingShape');
       setGhostElement({
@@ -418,6 +421,14 @@ export default function CanvasPage() {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
+    if (e.button === 1) { // Middle mouse button
+        if (action === 'panning') {
+            setAction('none');
+            initialState.current = null;
+        }
+        return;
+    }
+    
     if (action === 'creatingShape' && ghostElement && activeTool) {
       if (ghostElement.width > 5 && ghostElement.height > 5) {
         const newElement: DiagramElement = {
@@ -481,7 +492,7 @@ export default function CanvasPage() {
   
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    if (e.ctrlKey) {
+    if (e.ctrlKey) { // Pinch-to-zoom on trackpads OR Ctrl+Scroll
         const { clientX, clientY, deltaY } = e;
         const zoomFactor = 0.05;
         
@@ -494,12 +505,13 @@ export default function CanvasPage() {
             const mouseX = clientX - containerRect.left;
             const mouseY = clientY - containerRect.top;
             
+            // Pan to keep the mouse position consistent relative to the canvas content
             const newDx = mouseX - (mouseX - prevTransform.dx) * (newScale / prevTransform.scale);
             const newDy = mouseY - (mouseY - prevTransform.dy) * (newScale / prevTransform.scale);
         
             return { scale: newScale, dx: newDx, dy: newDy };
         });
-    } else {
+    } else { // Pan with mouse wheel or two-finger swipe on trackpad
         const { deltaX, deltaY } = e;
         setTransform(prevTransform => ({
             ...prevTransform,
@@ -577,6 +589,15 @@ export default function CanvasPage() {
                             value={el.content}
                             onChange={handleTextareaChange}
                             onBlur={cancelEditing}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    cancelEditing();
+                                }
+                                if (e.key === 'Escape') {
+                                    cancelEditing();
+                                }
+                            }}
                             style={{
                                 position: 'absolute',
                                 left: left,

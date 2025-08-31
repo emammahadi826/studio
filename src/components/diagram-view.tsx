@@ -89,7 +89,7 @@ function Element({
   };
   
   const styleProps = {
-    fill: isSelected ? 'transparent' : (element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent'),
+    fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent',
     stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
     cursor: 'move',
@@ -366,7 +366,7 @@ interface DiagramViewProps {
   ghostElement: DiagramElement | null;
   marqueeRect: { x: number; y: number; width: number; height: number; } | null;
   onToolSelect: (type: DiagramElement['type']) => void;
-  onCanvasMouseDown: (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
+  onCanvasMouseDown: (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
   selectedElementIds: string[];
   activeTool: DiagramElement['type'] | null;
   editingElementId: string | null;
@@ -405,6 +405,7 @@ export function DiagramView({
         height="100%" 
         className="bg-background"
         onMouseDown={(e) => {
+            // Check if the event target is the SVG itself, not a child element
             if (e.target === e.currentTarget) {
                 onCanvasMouseDown(e, null);
             }
