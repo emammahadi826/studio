@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CanvasHeader } from '@/components/canvas-header';
 import { NotepadView } from '@/components/notepad-view';
 import { DiagramView } from '@/components/diagram-view';
@@ -23,7 +23,16 @@ export default function Home() {
   const [action, setAction] = useState<Action>('none');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
-  const [initialMousePosition, setInitialMousePosition] = useState<{ x: number; y: number } | null>(null);
+  
+  // Use a ref for initial position to prevent re-renders on move
+  const initialDragState = useRef<{
+    elementX: number;
+    elementY: number;
+    elementWidth: number;
+    elementHeight: number;
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
 
   useEffect(() => {
     try {
@@ -145,57 +154,77 @@ export default function Home() {
     toast({ title: 'Exported!', description: 'Your diagram has been downloaded as an SVG file.' });
   }, [toast]);
 
-  const handleCanvasMouseDown = (e: React.MouseEvent<SVGSVGElement>, elementId: string | null, handle?: ResizingHandle) => {
-    e.preventDefault();
+  const handleCanvasMouseDown = (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle) => {
     if (elementId) {
-      setSelectedElementId(elementId);
-      setInitialMousePosition({ x: e.clientX, y: e.clientY });
-      if (handle) {
-        setAction('resizing');
-        setResizingHandle(handle);
-      } else {
-        setAction('dragging');
-      }
+        const selectedElement = elements.find(el => el.id === elementId);
+        if (!selectedElement) return;
+
+        setSelectedElementId(elementId);
+        initialDragState.current = {
+            elementX: selectedElement.x,
+            elementY: selectedElement.y,
+            elementWidth: selectedElement.width,
+            elementHeight: selectedElement.height,
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+        };
+
+        if (handle) {
+            setAction('resizing');
+            setResizingHandle(handle);
+        } else {
+            setAction('dragging');
+        }
     } else {
-      setSelectedElementId(null);
+        setSelectedElementId(null);
     }
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (action === 'none' || !initialMousePosition || !selectedElementId) return;
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (action === 'none' || !initialDragState.current || !selectedElementId) return;
 
-    const dx = e.clientX - initialMousePosition.x;
-    const dy = e.clientY - initialMousePosition.y;
+    const dx = e.clientX - initialDragState.current.mouseX;
+    const dy = e.clientY - initialDragState.current.mouseY;
 
     setElements(prevElements =>
       prevElements.map(el => {
         if (el.id === selectedElementId) {
-          const originalElement = prevElements.find(pEl => pEl.id === selectedElementId)!;
           if (action === 'dragging') {
-            return { ...el, x: el.x + dx, y: el.y + dy };
+            return {
+              ...el,
+              x: initialDragState.current!.elementX + dx,
+              y: initialDragState.current!.elementY + dy,
+            };
           } else if (action === 'resizing' && resizingHandle) {
-            let { x, y, width, height } = el;
+            let { x, y, width, height } = initialDragState.current!;
+            const { elementX, elementY, elementWidth, elementHeight } = initialDragState.current!;
             const minSize = 20;
 
             if (resizingHandle.includes('bottom')) {
-                height = Math.max(minSize, el.height + dy);
+              height = Math.max(minSize, elementHeight + dy);
             }
             if (resizingHandle.includes('top')) {
-                const newHeight = Math.max(minSize, el.height - dy);
-                if (newHeight > minSize) {
-                    y = el.y + dy;
-                    height = newHeight;
-                }
+              const newHeight = elementHeight - dy;
+              if (newHeight > minSize) {
+                y = elementY + dy;
+                height = newHeight;
+              } else {
+                height = minSize;
+                y = elementY + elementHeight - minSize;
+              }
             }
             if (resizingHandle.includes('right')) {
-                width = Math.max(minSize, el.width + dx);
+              width = Math.max(minSize, elementWidth + dx);
             }
             if (resizingHandle.includes('left')) {
-                const newWidth = Math.max(minSize, el.width - dx);
-                if (newWidth > minSize) {
-                    x = el.x + dx;
-                    width = newWidth;
-                }
+              const newWidth = elementWidth - dx;
+              if(newWidth > minSize) {
+                x = elementX + dx;
+                width = newWidth;
+              } else {
+                width = minSize;
+                x = elementX + elementWidth - minSize;
+              }
             }
             return { ...el, x, y, width, height };
           }
@@ -203,18 +232,17 @@ export default function Home() {
         return el;
       })
     );
-    setInitialMousePosition({ x: e.clientX, y: e.clientY });
   };
 
   const handleCanvasMouseUp = () => {
     setAction('none');
     setResizingHandle(null);
-    setInitialMousePosition(null);
+    initialDragState.current = null;
     // Don't reset selectedElementId here, so we can show handles on the selected element
   };
   
   return (
-    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col" onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp}>
+    <main className="h-screen w-screen bg-background overflow-hidden flex flex-col" onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}>
       <CanvasHeader
         view={view}
         onViewChange={setView}
