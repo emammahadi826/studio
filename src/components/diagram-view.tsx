@@ -223,18 +223,72 @@ function Element({
 
 function GhostElement({ element }: { element: DiagramElement | null }) {
     if (!element) return null;
-    return (
-        <rect
-            x={element.x}
-            y={element.y}
-            width={element.width}
-            height={element.height}
-            fill="hsla(var(--primary), 0.2)"
-            stroke="hsl(var(--primary))"
-            strokeWidth="2"
-            strokeDasharray="5 5"
-        />
-    )
+
+    const commonProps = {
+        fill: "hsla(var(--primary), 0.2)",
+        stroke: "hsl(var(--primary))",
+        strokeWidth: "2",
+        strokeDasharray: "5 5",
+    };
+
+    switch (element.type) {
+        case 'circle':
+            return (
+                <ellipse
+                    cx={element.x + element.width / 2}
+                    cy={element.y + element.height / 2}
+                    rx={element.width / 2}
+                    ry={element.height / 2}
+                    {...commonProps}
+                />
+            );
+        case 'diamond':
+            const { x: dx, y: dy, width: dw, height: dh } = element;
+            const dpoints = `${dx + dw / 2},${dy} ${dx + dw},${dy + dh / 2} ${dx + dw / 2},${dy + dh} ${dx},${dy + dh / 2}`;
+            return (
+                <polygon points={dpoints} {...commonProps} />
+            );
+        case 'triangle':
+            const { x: tx, y: ty, width: tw, height: th } = element;
+            const tpoints = `${tx + tw / 2},${ty} ${tx + tw},${ty + th} ${tx},${ty + th}`;
+            return (
+                <polygon points={tpoints} {...commonProps} />
+            );
+        case 'cylinder': {
+            const { x, y, width, height } = element;
+            const ellipseHeight = Math.min(height * 0.3, 20);
+            return (
+                <>
+                    <path
+                        d={`M${x},${y + ellipseHeight / 2} C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2} L${x + width},${y + height - ellipseHeight / 2} C${x + width},${y + height + ellipseHeight / 2} ${x},${y + height + ellipseHeight / 2} ${x},${y + height - ellipseHeight / 2} Z`}
+                        {...commonProps}
+                    />
+                    <ellipse
+                        cx={x + width / 2}
+                        cy={y + ellipseHeight / 2}
+                        rx={width / 2}
+                        ry={ellipseHeight / 2}
+                        {...commonProps}
+                    />
+                </>
+            );
+        }
+        case 'rectangle':
+        case 'sticky-note':
+        case 'text':
+        default:
+            return (
+                <rect
+                    x={element.x}
+                    y={element.y}
+                    width={element.width}
+                    height={element.height}
+                    {...commonProps}
+                    rx="8"
+                    ry="8"
+                />
+            );
+    }
 }
 
 function Marquee({ rect }: { rect: { x: number; y: number; width: number; height: number; } | null }) {
