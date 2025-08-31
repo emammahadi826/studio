@@ -19,17 +19,17 @@ export function MainSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between p-2">
            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">CanvasNote</h1>
            <SidebarTrigger className="hidden md:flex" />
         </div>
       </SidebarHeader>
-      <SidebarMenu>
+      <SidebarMenu className="flex-grow">
         <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Home">
               <Link href="/">
                 <Home />
-                <span>Home</span>
+                <span className="group-data-[collapsible=icon]:hidden">Home</span>
               </Link>
             </SidebarMenuButton>
         </SidebarMenuItem>
@@ -37,7 +37,7 @@ export function MainSidebar() {
             <SidebarMenuButton asChild isActive={pathname.startsWith('/canvas')} tooltip="Canvas">
               <Link href="/canvas">
                 <NotebookPen />
-                <span>Canvas</span>
+                <span className="group-data-[collapsible=icon]:hidden">Canvas</span>
               </Link>
             </SidebarMenuButton>
         </SidebarMenuItem>

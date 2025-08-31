@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -25,10 +26,10 @@ export default function RootLayout({
         <SidebarProvider>
             <MainSidebar />
             <SidebarInset>
-                <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-                    <SidebarTrigger className="md:hidden" />
+                <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
+                    <SidebarTrigger />
                 </header>
-                <main className="p-4 sm:px-6 sm:py-0">
+                <main className="flex-1 p-4 sm:px-6 sm:py-0">
                     {children}
                 </main>
             </SidebarInset>
