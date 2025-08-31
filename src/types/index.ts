@@ -1,6 +1,6 @@
 export interface DiagramElement {
   id: string;
-  type: 'rectangle' | 'circle' | 'sticky-note' | 'text';
+  type: 'rectangle' | 'circle' | 'sticky-note' | 'text' | 'diamond' | 'triangle' | 'cylinder';
   x: number;
   y: number;
   width: number;

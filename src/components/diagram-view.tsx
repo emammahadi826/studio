@@ -1,6 +1,6 @@
 'use client';
 
-import { Circle, Square, Type, StickyNote } from 'lucide-react';
+import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DiagramElement, DiagramConnection } from '@/types';
@@ -9,6 +9,9 @@ function DiagramToolbar({ onAddElement }: { onAddElement: (type: DiagramElement[
   const tools = [
     { type: 'rectangle', icon: Square, label: 'Rectangle' },
     { type: 'circle', icon: Circle, label: 'Circle' },
+    { type: 'diamond', icon: Diamond, label: 'Diamond' },
+    { type: 'triangle', icon: Triangle, label: 'Triangle' },
+    { type: 'cylinder', icon: Cylinder, label: 'Cylinder' },
     { type: 'sticky-note', icon: StickyNote, label: 'Sticky Note' },
     { type: 'text', icon: Type, label: 'Text' },
   ] as const;
@@ -100,6 +103,54 @@ function Element({
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
+      case 'diamond':
+        const { x, y, width, height } = element;
+        const points = `${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}`;
+        return (
+          <>
+            <polygon points={points} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <foreignObject {...commonProps}>{textDiv}</foreignObject>
+          </>
+        );
+      case 'triangle': {
+        const { x, y, width, height } = element;
+        const points = `${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`;
+        return (
+          <>
+            <polygon points={points} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" cursor="move" onMouseDown={(e) => onMouseDown(e, element.id)} />
+            <foreignObject {...commonProps}>{textDiv}</foreignObject>
+          </>
+        );
+      }
+      case 'cylinder': {
+        const { x, y, width, height } = element;
+        const ellipseHeight = Math.min(height * 0.3, 20);
+        return (
+          <>
+            <path 
+              d={`M${x},${y + ellipseHeight / 2} 
+                 C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
+                 L${x + width},${y + height - ellipseHeight / 2}
+                 C${x + width},${y + height + ellipseHeight / 2} ${x},${y + height + ellipseHeight / 2} ${x},${y + height - ellipseHeight / 2}
+                 Z`}
+              fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2"
+            />
+             <ellipse 
+              cx={x + width / 2} 
+              cy={y + ellipseHeight / 2} 
+              rx={width / 2} 
+              ry={ellipseHeight / 2} 
+              fill="hsl(var(--card))" 
+              stroke="hsl(var(--foreground))" 
+              strokeWidth="2"
+            />
+            <g onMouseDown={(e) => onMouseDown(e, element.id)} cursor="move">
+                <rect {...commonProps} fill="transparent" />
+                 <foreignObject {...commonProps}>{textDiv}</foreignObject>
+            </g>
+          </>
+        );
+      }
       case 'sticky-note':
         return (
           <>

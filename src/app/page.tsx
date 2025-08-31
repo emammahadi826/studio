@@ -92,8 +92,8 @@ export default function Home() {
       content: `New ${type}`,
       x: Math.random() * 300 + 50,
       y: Math.random() * 300 + 50,
-      width: 150,
-      height: type === 'sticky-note' ? 150 : 80,
+      width: type === 'diamond' || type === 'triangle' ? 180 : 150,
+      height: type === 'sticky-note' ? 150 : (type === 'diamond' || type === 'triangle' ? 120 : 80),
       backgroundColor: type === 'sticky-note' ? '#FFF9C4' : undefined,
     };
     setElements(prev => [...prev, newElement]);
