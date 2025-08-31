@@ -14,7 +14,7 @@ function DiagramToolbar({ onAddElement }: { onAddElement: (type: DiagramElement[
   ] as const;
 
   return (
-    <div className="absolute top-4 left-4 z-10 bg-card p-2 rounded-lg border shadow-md flex flex-col gap-1">
+    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-10 bg-card p-2 rounded-lg border shadow-md flex flex-col gap-1">
       <TooltipProvider delayDuration={0}>
         {tools.map((tool) => (
           <Tooltip key={tool.type}>
