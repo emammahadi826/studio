@@ -12,21 +12,16 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Button } from "./ui/button";
 
 export function MainSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-           <Button variant="ghost" size="icon" className="md:hidden" asChild>
-            <Link href="/">
-              <Home />
-            </Link>
-           </Button>
+        <div className="flex items-center justify-between">
            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">CanvasNote</h1>
+           <SidebarTrigger className="hidden md:flex" />
         </div>
       </SidebarHeader>
       <SidebarMenu>
