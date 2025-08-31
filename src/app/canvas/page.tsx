@@ -494,7 +494,7 @@ export default function CanvasPage() {
     e.preventDefault();
     if (e.ctrlKey || e.shiftKey) { // Pinch-to-zoom on trackpads OR Ctrl+Scroll
         const { clientX, clientY, deltaY } = e;
-        const zoomFactor = 0.05;
+        const zoomFactor = 0.005;
         
         setTransform(prevTransform => {
             const newScale = Math.max(0.1, Math.min(5, prevTransform.scale * (1 - deltaY * zoomFactor)));
