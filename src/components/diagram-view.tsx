@@ -72,12 +72,14 @@ function Element({
   onDoubleClick,
   isSelected,
   isEditing,
+  transform,
 }: { 
   element: DiagramElement;
   onMouseDown: (e: React.MouseEvent<any>, elementId: string, handle?: ResizingHandle | AnchorSide) => void;
   onDoubleClick: (elementId: string) => void;
   isSelected: boolean;
   isEditing: boolean;
+  transform: { scale: number };
 }) {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -91,7 +93,7 @@ function Element({
   const styleProps = {
     fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent',
     stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
-    strokeWidth: isSelected ? 2 : (element.type === 'sticky-note' ? 1 : 2),
+    strokeWidth: isSelected ? 2 / transform.scale : (element.type === 'sticky-note' ? 1 / transform.scale : 2 / transform.scale),
     cursor: 'move',
   };
 
@@ -125,7 +127,7 @@ function Element({
     </div>
   )
 
-  const handleSize = 8;
+  const handleSize = 8 / transform.scale;
   const handles: { position: ResizingHandle; cursor: string; x: number; y: number }[] = [
     { position: 'top-left', cursor: 'nwse-resize', x: element.x - handleSize/2, y: element.y - handleSize/2 },
     { position: 'top-right', cursor: 'nesw-resize', x: element.x + element.width - handleSize/2, y: element.y - handleSize/2 },
@@ -153,7 +155,7 @@ function Element({
       case 'rectangle':
         return (
           <>
-            <rect {...commonProps} {...styleProps} rx="8" ry="8" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
@@ -238,7 +240,7 @@ function Element({
               height={handleSize}
               fill="hsla(var(--background), 0.5)"
               stroke="hsl(var(--primary))"
-              strokeWidth="1"
+              strokeWidth={1 / transform.scale}
               cursor={handle.cursor}
               onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
           />
@@ -251,8 +253,8 @@ function Element({
           height={element.height}
           fill="transparent"
           stroke="hsl(var(--primary))"
-          strokeWidth="1"
-          rx="8" ry="8"
+          strokeWidth={1 / transform.scale}
+          rx={8 / transform.scale} ry={8 / transform.scale}
           style={{ pointerEvents: 'none' }}
         />
       )}
@@ -260,14 +262,14 @@ function Element({
   );
 }
 
-function GhostElement({ element }: { element: DiagramElement | null }) {
+function GhostElement({ element, transform }: { element: DiagramElement | null, transform: { scale: number } }) {
     if (!element) return null;
 
     const commonProps = {
         fill: "hsla(var(--primary), 0.2)",
         stroke: "hsl(var(--primary))",
-        strokeWidth: "2",
-        strokeDasharray: "5 5",
+        strokeWidth: 2 / transform.scale,
+        strokeDasharray: `${5 / transform.scale} ${5 / transform.scale}`,
     };
 
     switch (element.type) {
@@ -323,28 +325,28 @@ function GhostElement({ element }: { element: DiagramElement | null }) {
                     width={element.width}
                     height={element.height}
                     {...commonProps}
-                    rx="8"
-                    ry="8"
+                    rx={8 / transform.scale}
+                    ry={8 / transform.scale}
                 />
             );
     }
 }
 
-function Marquee({ rect }: { rect: { x: number; y: number; width: number; height: number; } | null }) {
+function Marquee({ rect, transform }: { rect: { x: number; y: number; width: number; height: number; } | null, transform: { scale: number } }) {
     if (!rect) return null;
     return (
         <rect
             {...rect}
-            rx="8"
-            ry="8"
+            rx={8 / transform.scale}
+            ry={8 / transform.scale}
             fill="hsla(217, 91%, 60%, 0.3)"
             stroke="hsl(var(--primary))"
-            strokeWidth="1"
+            strokeWidth={1 / transform.scale}
         />
     );
 }
 
-function Connection({ connection, elements }: { connection: DiagramConnection; elements: DiagramElement[] }) {
+function Connection({ connection, elements, transform }: { connection: DiagramConnection; elements: DiagramElement[], transform: { scale: number } }) {
     const sourceEl = elements.find(el => el.id === connection.source.elementId);
     const targetEl = elements.find(el => el.id === connection.target.elementId);
 
@@ -356,7 +358,7 @@ function Connection({ connection, elements }: { connection: DiagramConnection; e
     const y2 = targetEl.y + targetEl.height / 2;
 
     return (
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--foreground))" strokeWidth="2" markerEnd="url(#arrowhead)" />
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--foreground))" strokeWidth={2 / transform.scale} markerEnd="url(#arrowhead)" />
     );
 }
 
@@ -418,7 +420,7 @@ export function DiagramView({
         </defs>
         <g transform={`translate(${transform.dx}, ${transform.dy}) scale(${transform.scale})`}>
             {connections.map(conn => (
-                <Connection key={conn.id} connection={conn} elements={elements} />
+                <Connection key={conn.id} connection={conn} elements={elements} transform={transform} />
             ))}
             {elements.map(el => (
                 <Element 
@@ -428,10 +430,11 @@ export function DiagramView({
                     onDoubleClick={onElementDoubleClick}
                     isSelected={selectedElementIds.includes(el.id)}
                     isEditing={editingElementId === el.id}
+                    transform={transform}
                  />
             ))}
-            <GhostElement element={ghostElement} />
-            <Marquee rect={marqueeRect} />
+            <GhostElement element={ghostElement} transform={transform} />
+            <Marquee rect={marqueeRect} transform={transform} />
         </g>
       </svg>
     </div>
