@@ -16,7 +16,6 @@ import {
 import { Button } from "../ui/button";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useCallback, useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "../ui/dialog";
 import { Input } from "../ui/input";
 
 export const LinkSelector = ({
@@ -52,20 +51,24 @@ export const LinkSelector = ({
   }, [isOpen, editor]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
           data-active={editor.isActive('link')}
+          onClick={(e) => {
+            if (editor.state.selection.empty) {
+                e.preventDefault();
+                alert("Please select text to apply a link.");
+                setIsOpen(false);
+            }
+          }}
         >
           <Link className="h-4 w-4" />
         </Button>
-      </DialogTrigger>
-      <DialogContent className="p-4 relative sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Link</DialogTitle>
-        </DialogHeader>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-2">
         <div className="flex items-center gap-2">
           <Input
             autoFocus
@@ -81,23 +84,22 @@ export const LinkSelector = ({
                 }
             }}
           />
+           <Button size="sm" onClick={() => applyLink(url)} className="h-8">
+              Apply
+          </Button>
         </div>
-        <DialogFooter className="!justify-between">
-            {editor.getAttributes("link").href ? (
-                <Button
-                variant="outline"
-                type="button"
-                className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-500"
-                onClick={() => removeLink()}
-                >
-                Remove link
-                </Button>
-            ) : <div />}
-            <Button size="sm" onClick={() => applyLink(url)}>
-                Apply
+         {editor.getAttributes("link").href && (
+            <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-500 w-full mt-2"
+            onClick={() => removeLink()}
+            >
+            Remove link
             </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 };
