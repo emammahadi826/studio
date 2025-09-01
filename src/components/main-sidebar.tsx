@@ -24,8 +24,8 @@ export function MainSidebar() {
       <SidebarHeader>
         <div className="flex items-center justify-between p-2">
            <Link href="/" className="flex items-center gap-2">
-            <NotebookPen className="w-6 h-6 text-primary group-data-[collapsible=icon]:w-7 group-data-[collapsible=icon]:h-7" />
-            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">CanvasNote</h1>
+            <NotebookPen className="w-6 h-6 text-primary group-data-[collapsible=icon]:hidden" />
+            <h1 className="text-lg font-semibold">CanvasNote</h1>
            </Link>
            <SidebarTrigger className="hidden md:flex" />
         </div>
