@@ -17,7 +17,6 @@ import {
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useSidebar } from './ui/sidebar';
 import { Input } from './ui/input';
 import {
   AlertDialog,
@@ -57,13 +56,11 @@ export function CanvasHeader({
   onCanvasNameChange,
   onCreateNew,
 }: CanvasHeaderProps) {
-  const { state, isMobile } = useSidebar();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   return (
     <header 
-      className="fixed top-0 right-0 z-20 flex items-center justify-between p-2 px-4 bg-card/80 backdrop-blur-sm border-b transition-[left] ease-linear"
-      style={{ left: isMobile ? '0px' : (state === 'expanded' ? 'var(--sidebar-width)' : 'var(--sidebar-width-icon)') }}
+      className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between p-2 px-4 bg-card/80 backdrop-blur-sm border-b"
     >
       <div className="flex items-center gap-2">
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
