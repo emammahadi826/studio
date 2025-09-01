@@ -225,7 +225,7 @@ const Sidebar = React.forwardRef<
         {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
-            "duration-200 relative h-svh bg-transparent transition-[width] ease-linear",
+            "duration-300 relative h-svh bg-transparent transition-[width] ease-in-out",
             "w-0 group-data-[state=expanded]:w-[--sidebar-width]",
             "group-data-[collapsible=icon]:group-data-[state=collapsed]:w-[--sidebar-width-icon]",
             variant === "floating" || variant === "inset"
@@ -235,7 +235,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            "duration-300 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-in-out md:flex",
             side === "left" ? "left-0" : "right-0",
             state === "collapsed" && "w-0",
             state === 'collapsed' && collapsible === 'offcanvas' && side === "left" && "-translate-x-full",
@@ -564,7 +564,7 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        className={cn(sidebarMenuButtonVariants({ variant, size }), className, isActive && "bg-sidebar-accent text-sidebar-accent-foreground")}
         {...props}
       />
     )
