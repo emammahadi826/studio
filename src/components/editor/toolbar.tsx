@@ -48,16 +48,16 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
 
     return (
         <div 
-            className="absolute z-10 bg-card p-2 rounded-lg border shadow-md flex flex-col gap-1"
+            className="absolute z-10 bg-card p-2 rounded-lg border shadow-md flex items-center gap-1"
             style={{ top: position.y, left: position.x }}
         >
              <div 
-                className="cursor-move text-center py-1 text-muted-foreground"
+                className="cursor-move p-1 text-muted-foreground"
                 onMouseDown={onMouseDown}
             >
-                <Move className="w-4 h-4 mx-auto" />
+                <Move className="w-4 h-4" />
             </div>
-            <div className="flex flex-col items-center space-y-1">
+            <div className="flex items-center space-x-1">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -96,9 +96,9 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Separator orientation="horizontal" className="w-6" />
+                <Separator orientation="vertical" className="h-6" />
 
-                <ToggleGroup type="multiple" size="sm" orientation="vertical">
+                <ToggleGroup type="multiple" size="sm">
                      <ToggleGroupItem value="bold" aria-label="Toggle bold" onClick={() => editor.chain().focus().toggleBold().run()} data-active={editor.isActive('bold')}>
                         <Bold className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -113,9 +113,9 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
                     </ToggleGroupItem>
                 </ToggleGroup>
                 
-                <Separator orientation="horizontal" className="w-6" />
+                <Separator orientation="vertical" className="h-6" />
 
-                <ToggleGroup type="single" size="sm" orientation="vertical">
+                <ToggleGroup type="single" size="sm">
                     <ToggleGroupItem value="bulletList" aria-label="Bullet list" onClick={() => editor.chain().focus().toggleBulletList().run()} data-active={editor.isActive('bulletList')}>
                         <List className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -124,9 +124,9 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
                     </ToggleGroupItem>
                 </ToggleGroup>
                 
-                <Separator orientation="horizontal" className="w-6" />
+                <Separator orientation="vertical" className="h-6" />
                 
-                <ToggleGroup type="single" size="sm" defaultValue="left" orientation="vertical">
+                <ToggleGroup type="single" size="sm" defaultValue="left">
                     <ToggleGroupItem value="left" aria-label="Align left" onClick={() => editor.chain().focus().setTextAlign('left').run()} data-active={editor.isActive({ textAlign: 'left' })}>
                         <AlignLeft className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -141,9 +141,9 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
                     </ToggleGroupItem>
                 </ToggleGroup>
 
-                 <Separator orientation="horizontal" className="w-6" />
+                 <Separator orientation="vertical" className="h-6" />
 
-                <ToggleGroup type="single" size="sm" orientation="vertical">
+                <ToggleGroup type="single" size="sm">
                     <ToggleGroupItem value="codeBlock" aria-label="Code block" onClick={() => editor.chain().focus().toggleCodeBlock().run()} data-active={editor.isActive('codeBlock')}>
                         <Code2 className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -152,7 +152,7 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
                     </ToggleGroupItem>
                 </ToggleGroup>
 
-                 <Separator orientation="horizontal" className="w-6" />
+                 <Separator orientation="vertical" className="h-6" />
                  
                 <LinkSelector
                     editor={editor}
