@@ -2,13 +2,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import { CanvasHeader } from '@/components/canvas-header';
 import { NotepadView } from '@/components/notepad-view';
 import { DiagramView } from '@/components/diagram-view';
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
-import type { DiagramElement, DiagramConnection } from '@/types';
-import { useSidebar } from '@/components/ui/sidebar';
+import type { DiagramElement, DiagramConnection, CanvasMetadata } from '@/types';
 
 export type View = 'notepad' | 'diagram';
 type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
@@ -16,19 +16,32 @@ type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' 
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
 
+interface CanvasData {
+  notes: string;
+  elements: DiagramElement[];
+  connections: DiagramConnection[];
+  toolbarPosition: { x: number, y: number };
+  transform: { scale: number, dx: number, dy: number };
+}
+
 function isIntersecting(a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }) {
   return !(b.x > a.x + a.width || b.x + b.width < a.x || b.y > a.y + a.height || b.y + b.height < a.y);
 }
 
 export default function CanvasPage() {
+  const params = useParams();
+  const canvasId = params.canvasId as string;
+
   const [view, setView] = useState<View>('notepad');
+  const [canvasName, setCanvasName] = useState<string>('Untitled Canvas');
   const [notes, setNotes] = useState<string>('');
   const [elements, setElements] = useState<DiagramElement[]>([]);
   const [connections, setConnections] = useState<DiagramConnection[]>([]);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 16, y: 16 });
+  const [transform, setTransform] = useState({ scale: 1, dx: 0, dy: 0 });
+
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
-  const { state, isMobile } = useSidebar();
-
 
   const [action, setAction] = useState<Action>('none');
   const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
@@ -37,8 +50,6 @@ export default function CanvasPage() {
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 16, y: 16 });
-  const [transform, setTransform] = useState({ scale: 1, dx: 0, dy: 0 });
   
   const initialState = useRef<{
     elements?: DiagramElement[];
@@ -54,44 +65,66 @@ export default function CanvasPage() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!canvasId) return;
     setIsMounted(true);
     try {
-      const savedNotes = localStorage.getItem('canvasnote-notes');
-      const savedElements = localStorage.getItem('canvasnote-elements');
-      const savedConnections = localStorage.getItem('canvasnote-connections');
-      const savedToolbarPos = localStorage.getItem('canvasnote-toolbar-pos');
-      const savedTransform = localStorage.getItem('canvasnote-transform');
-      
-      if (savedNotes) setNotes(JSON.parse(savedNotes));
-      if (savedElements) setElements(JSON.parse(savedElements));
-      if (savedConnections) setConnections(JSON.parse(savedConnections));
-      
-      if (savedToolbarPos) {
-        setToolbarPosition(JSON.parse(savedToolbarPos));
-      } else if(canvasContainerRef.current) {
+      // Load canvas metadata
+      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
+      if (allCanvasesStr) {
+        const allCanvases = JSON.parse(allCanvasesStr) as CanvasMetadata[];
+        const currentCanvasMeta = allCanvases.find(c => c.id === canvasId);
+        if (currentCanvasMeta) {
+          setCanvasName(currentCanvasMeta.name);
+        }
+      }
+
+      // Load canvas data
+      const savedDataStr = localStorage.getItem(`canvasnote-data-${canvasId}`);
+      if (savedDataStr) {
+        const savedData = JSON.parse(savedDataStr) as CanvasData;
+        setNotes(savedData.notes);
+        setElements(savedData.elements);
+        setConnections(savedData.connections);
+        if(savedData.toolbarPosition) setToolbarPosition(savedData.toolbarPosition);
+        if(savedData.transform) setTransform(savedData.transform);
+      } else if (canvasContainerRef.current) {
         setToolbarPosition({ x: 16, y: canvasContainerRef.current.clientHeight / 2 - 150 });
       }
-      
-      if (savedTransform) setTransform(JSON.parse(savedTransform));
 
     } catch (error) {
       console.error("Failed to load from localStorage", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not load saved data." });
+      toast({ variant: "destructive", title: "Error", description: "Could not load saved canvas data." });
     }
-  }, [toast]);
+  }, [canvasId, toast]);
 
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || !canvasId) return;
     try {
-      localStorage.setItem('canvasnote-notes', JSON.stringify(notes));
-      localStorage.setItem('canvasnote-elements', JSON.stringify(elements));
-      localStorage.setItem('canvasnote-connections', JSON.stringify(connections));
-      localStorage.setItem('canvasnote-toolbar-pos', JSON.stringify(toolbarPosition));
-      localStorage.setItem('canvasnote-transform', JSON.stringify(transform));
+      const dataToSave: CanvasData = {
+        notes,
+        elements,
+        connections,
+        toolbarPosition,
+        transform,
+      };
+      localStorage.setItem(`canvasnote-data-${canvasId}`, JSON.stringify(dataToSave));
+
+      // Update lastModified timestamp in metadata
+      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
+      if (allCanvasesStr) {
+          let allCanvases = JSON.parse(allCanvasesStr) as CanvasMetadata[];
+          const canvasIndex = allCanvases.findIndex(c => c.id === canvasId);
+          if (canvasIndex !== -1) {
+              allCanvases[canvasIndex].lastModified = new Date().toISOString();
+              allCanvases[canvasIndex].name = canvasName;
+              localStorage.setItem('canvasnote-all-canvases', JSON.stringify(allCanvases));
+          }
+      }
+
     } catch (error) {
       console.error("Failed to save to localStorage", error);
     }
-  }, [notes, elements, connections, toolbarPosition, transform, isMounted]);
+  }, [canvasId, canvasName, notes, elements, connections, toolbarPosition, transform, isMounted]);
   
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
@@ -203,13 +236,13 @@ export default function CanvasPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'canvas-notes.md';
+    a.download = `${canvasName}-notes.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!', description: 'Your notes have been downloaded as a Markdown file.' });
-  }, [notes, toast]);
+  }, [notes, canvasName, toast]);
 
   const handleExportSVG = useCallback(() => {
     const svgElement = document.getElementById('diagram-canvas');
@@ -219,20 +252,20 @@ export default function CanvasPage() {
     }
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(svgElement);
-    const styleEl = `<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&amp;display=swap');</style>`;
+    const styleEl = `<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');</style>`;
     svgString = svgString.replace(/<defs>/, `<defs>${styleEl}`);
 
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'canvas-diagram.svg';
+    a.download = `${canvasName}-diagram.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({ title: 'Exported!', description: 'Your diagram has been downloaded as an SVG file.' });
-  }, [toast]);
+  }, [canvasName, toast]);
   
   const handleToolbarMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -539,6 +572,8 @@ export default function CanvasPage() {
         isDiagramView={view === 'diagram'}
         canSuggestConnections={elements.length >= 2}
         canGenerateDiagram={notes.trim().length > 0}
+        canvasName={canvasName}
+        onCanvasNameChange={setCanvasName}
       />
       <div 
         className="flex-grow relative"
@@ -572,7 +607,7 @@ export default function CanvasPage() {
                   editingElementId={editingElementId}
                   onElementDoubleClick={handleElementDoubleClick}
                   toolbarPosition={toolbarPosition}
-                  onToolbarMouseDown={handleToolbarMouseDown}
+                  onToolbarMouseDown={onToolbarMouseDown}
                   transform={transform}
               />
             </div>
@@ -630,5 +665,3 @@ export default function CanvasPage() {
     </main>
   );
 }
-
-    

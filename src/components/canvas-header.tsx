@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSidebar } from './ui/sidebar';
+import { Input } from './ui/input';
 
 export type View = 'notepad' | 'diagram';
 
@@ -26,6 +27,8 @@ interface CanvasHeaderProps {
   isDiagramView: boolean;
   canSuggestConnections: boolean;
   canGenerateDiagram: boolean;
+  canvasName: string;
+  onCanvasNameChange: (name: string) => void;
 }
 
 export function CanvasHeader({
@@ -37,7 +40,9 @@ export function CanvasHeader({
   onExportSVG,
   isDiagramView,
   canSuggestConnections,
-  canGenerateDiagram
+  canGenerateDiagram,
+  canvasName,
+  onCanvasNameChange,
 }: CanvasHeaderProps) {
   const { state, isMobile } = useSidebar();
   return (
@@ -45,7 +50,11 @@ export function CanvasHeader({
       className="fixed top-0 right-0 z-20 flex items-center justify-between p-2 px-4 bg-card/80 backdrop-blur-sm border-b transition-[left] ease-linear"
       style={{ left: isMobile ? '0px' : (state === 'expanded' ? 'var(--sidebar-width)' : 'var(--sidebar-width-icon)') }}
     >
-      <h1 className="text-lg font-bold">CanvasNote</h1>
+      <Input 
+        value={canvasName}
+        onChange={(e) => onCanvasNameChange(e.target.value)}
+        className="text-lg font-bold w-auto bg-transparent border-none focus-visible:ring-1 focus-visible:ring-offset-0"
+      />
       <div className="absolute left-1/2 -translate-x-1/2">
         <Tabs value={view} onValueChange={(value) => value && onViewChange(value as View)} className="w-full">
             <TabsList>

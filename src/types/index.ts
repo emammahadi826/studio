@@ -1,3 +1,11 @@
+
+export interface CanvasMetadata {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastModified: string;
+}
+
 export interface DiagramElement {
   id: string;
   type: 'rectangle' | 'circle' | 'sticky-note' | 'text' | 'diamond' | 'triangle' | 'cylinder';
