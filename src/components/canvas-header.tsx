@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BrainCircuit, Download, SquarePen, Workflow } from 'lucide-react';
+import { BrainCircuit, Download, MoreVertical, SquarePen, Trash2, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,6 +14,19 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSidebar } from './ui/sidebar';
 import { Input } from './ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useState } from 'react';
+
 
 export type View = 'notepad' | 'diagram';
 
@@ -24,6 +37,7 @@ interface CanvasHeaderProps {
   onSuggestConnections: () => void;
   onExportMarkdown: () => void;
   onExportSVG: () => void;
+  onDelete: () => void;
   isDiagramView: boolean;
   canSuggestConnections: boolean;
   canGenerateDiagram: boolean;
@@ -38,6 +52,7 @@ export function CanvasHeader({
   onSuggestConnections,
   onExportMarkdown,
   onExportSVG,
+  onDelete,
   isDiagramView,
   canSuggestConnections,
   canGenerateDiagram,
@@ -45,6 +60,8 @@ export function CanvasHeader({
   onCanvasNameChange,
 }: CanvasHeaderProps) {
   const { state, isMobile } = useSidebar();
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+
   return (
     <header 
       className="fixed top-0 right-0 z-20 flex items-center justify-between p-2 px-4 bg-card/80 backdrop-blur-sm border-b transition-[left] ease-linear"
@@ -129,6 +146,41 @@ export function CanvasHeader({
             <DropdownMenuItem disabled>Export Diagram as PNG (coming soon)</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled>Duplicate Canvas</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <AlertDialogTrigger asChild>
+                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Canvas
+                </DropdownMenuItem>
+              </AlertDialogTrigger>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your
+                canvas and remove your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </div>
     </header>
   );

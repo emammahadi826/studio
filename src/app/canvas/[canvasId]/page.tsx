@@ -149,6 +149,28 @@ export default function CanvasPage() {
     toast({ title: 'Elements Deleted', duration: 2000 });
   }, [selectedElementIds, toast]);
 
+  const handleDeleteCanvas = useCallback(() => {
+    if (!canvasId || !user) return;
+    try {
+      // Remove canvas data
+      localStorage.removeItem(`canvasnote-data-${canvasId}`);
+
+      // Remove canvas from metadata list
+      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
+      if (allCanvasesStr) {
+        let allCanvases = JSON.parse(allCanvasesStr) as CanvasMetadata[];
+        const updatedCanvases = allCanvases.filter(c => c.id !== canvasId);
+        localStorage.setItem('canvasnote-all-canvases', JSON.stringify(updatedCanvases));
+      }
+      
+      toast({ title: 'Canvas Deleted', description: 'The canvas has been successfully deleted.' });
+      router.push('/');
+    } catch (error) {
+      console.error("Failed to delete canvas from localStorage", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not delete canvas." });
+    }
+  }, [canvasId, user, toast, router]);
+
   const cancelEditing = useCallback(() => {
     if (editingElementId && textareaRef.current) {
       const newContent = textareaRef.current.value;
@@ -590,6 +612,7 @@ export default function CanvasPage() {
         onSuggestConnections={handleSuggestConnections}
         onExportMarkdown={handleExportMarkdown}
         onExportSVG={handleExportSVG}
+        onDelete={handleDeleteCanvas}
         isDiagramView={view === 'diagram'}
         canSuggestConnections={elements.length >= 2}
         canGenerateDiagram={notes.trim().length > 0}
