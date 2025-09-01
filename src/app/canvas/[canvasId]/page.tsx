@@ -99,8 +99,8 @@ export default function CanvasPage() {
 
   
   // Debounced save effect
-  const saveCanvas = useCallback(async (dataToSave: CanvasData) => {
-    if (!user || !canvasId) return;
+  const saveCanvas = useCallback(async (dataToSave: Partial<CanvasData>) => {
+    if (!user || !canvasId || !canvasData) return;
     try {
       const docRef = doc(db, "users", user.uid, "canvases", canvasId);
       await setDoc(docRef, {
@@ -111,7 +111,7 @@ export default function CanvasPage() {
       console.error("Failed to save to Firestore", error);
       // Optional: show a toast, but might be too noisy for auto-save
     }
-  }, [user, canvasId]);
+  }, [user, canvasId, canvasData]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -137,7 +137,10 @@ export default function CanvasPage() {
     });
   }, []);
 
-  const handleCanvasNameChange = (name: string) => updateCanvasData({ name });
+  const handleCanvasNameChange = (name: string) => {
+    updateCanvasData({ name });
+    saveCanvas({ name });
+  };
   const handleNotesChange = (notes: string) => updateCanvasData({ notes });
   const handleElementsChange = (updater: (prev: DiagramElement[]) => DiagramElement[]) => {
       updateCanvasData({ elements: updater(elements) });
