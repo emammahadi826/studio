@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -16,9 +17,14 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
+const PROTECTED_ROUTES = ['/', '/profile', '/settings', '/canvas'];
+const PUBLIC_ROUTES = ['/login', '/signup'];
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -28,6 +34,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route) && (pathname.length > route.length ? pathname.charAt(route.length) === '/' : true));
+
+    if (!user && isProtectedRoute) {
+      router.push('/login');
+    } else if (user && PUBLIC_ROUTES.includes(pathname)) {
+      router.push('/');
+    }
+  }, [user, loading, pathname, router]);
+
 
   if (loading) {
       return (

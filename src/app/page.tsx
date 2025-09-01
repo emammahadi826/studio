@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, BrainCircuit, LogIn } from 'lucide-react';
+import { Plus, BrainCircuit } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { CanvasMetadata } from '@/types';
 import { useAuth } from '@/context/auth-context';
@@ -19,11 +19,7 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    if (loading) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
+    if (loading || !user) return;
     
     // TODO: Replace with Firestore logic
     try {
@@ -36,7 +32,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Failed to load canvases from localStorage", error);
     }
-  }, [user, loading, router]);
+  }, [user, loading]);
 
   const handleCreateNewCanvas = () => {
     if (!user) {
@@ -71,7 +67,7 @@ export default function HomePage() {
       console.error("Failed to create new canvas in localStorage", error);
     }
   };
-
+  
   if (!isMounted || loading || !user) {
     return null; // or a loading spinner
   }

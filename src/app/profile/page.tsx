@@ -13,14 +13,8 @@ export default function ProfilePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
-
   if (loading || !user) {
-    return <div>Loading...</div>; // Or a skeleton loader
+    return null; // Or a skeleton loader
   }
 
   return (
