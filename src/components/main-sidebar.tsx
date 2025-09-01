@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Home, NotebookPen } from "lucide-react";
 import {
   Sidebar,
+  SidebarContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
@@ -26,24 +27,26 @@ export function MainSidebar() {
            <SidebarTrigger className="hidden md:flex" />
         </div>
       </SidebarHeader>
-      <SidebarMenu className="flex-grow">
-        <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Home">
-              <Link href="/">
-                <Home />
-                <span className="group-data-[collapsible=icon]:hidden">Home</span>
-              </Link>
-            </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname.startsWith('/canvas')} tooltip="Canvas">
-              <Link href="/canvas">
-                <NotebookPen />
-                <span className="group-data-[collapsible=icon]:hidden">Canvas</span>
-              </Link>
-            </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
+      <SidebarContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Home">
+                <Link href="/">
+                  <Home />
+                  <span className="group-data-[collapsible=icon]:hidden">Home</span>
+                </Link>
+              </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/canvas')} tooltip="Canvas">
+                <Link href="/canvas">
+                  <NotebookPen />
+                  <span className="group-data-[collapsible=icon]:hidden">Canvas</span>
+                </Link>
+              </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarContent>
     </Sidebar>
   );
 }
