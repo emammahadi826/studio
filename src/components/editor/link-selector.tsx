@@ -89,7 +89,7 @@ export const LinkSelector = ({
             onChange={(event) => setUrl(event.target.value)}
             type="url"
             placeholder="Paste a link"
-            className="flex-1 h-8"
+            className="flex-1 h-8 focus-visible:ring-0 focus-visible:ring-offset-0"
             onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
