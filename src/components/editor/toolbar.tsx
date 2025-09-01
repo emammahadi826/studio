@@ -36,6 +36,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "../ui/button";
 import { LinkSelector } from "./link-selector";
 import { useState } from "react";
+import { Toggle } from "../ui/toggle";
 
 
 export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.MouseEvent) => void, position: {x: number, y: number} }) {
@@ -115,14 +116,20 @@ export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.Mous
                 
                 <Separator orientation="vertical" className="h-6" />
 
-                <ToggleGroup type="single" size="sm">
-                    <ToggleGroupItem value="bulletList" aria-label="Bullet list" onClick={() => editor.chain().focus().toggleBulletList().run()} data-active={editor.isActive('bulletList')}>
-                        <List className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="orderedList" aria-label="Ordered list" onClick={() => editor.chain().focus().toggleOrderedList().run()} data-active={editor.isActive('orderedList')}>
-                        <ListOrdered className="h-4 w-4" />
-                    </ToggleGroupItem>
-                </ToggleGroup>
+                 <Toggle
+                    size="sm"
+                    pressed={editor.isActive("bulletList")}
+                    onPressedChange={() => editor.chain().focus().toggleBulletList().run()}
+                    >
+                    <List className="h-4 w-4" />
+                </Toggle>
+                <Toggle
+                    size="sm"
+                    pressed={editor.isActive("orderedList")}
+                    onPressedChange={() => editor.chain().focus().toggleOrderedList().run()}
+                >
+                    <ListOrdered className="h-4 w-4" />
+                </Toggle>
                 
                 <Separator orientation="vertical" className="h-6" />
                 
