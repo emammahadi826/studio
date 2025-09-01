@@ -23,6 +23,7 @@ import {
     Link as LinkIcon,
     Plus,
     CaseSensitive,
+    Move
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -37,7 +38,7 @@ import { LinkSelector } from "./link-selector";
 import { useState } from "react";
 
 
-export function Toolbar() {
+export function Toolbar({ onMouseDown, position }: { onMouseDown: (e: React.MouseEvent) => void, position: {x: number, y: number} }) {
     const { editor } = useCurrentEditor();
     const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
 
@@ -46,8 +47,17 @@ export function Toolbar() {
     }
 
     return (
-        <div className="p-2 border-b">
-            <div className="flex items-center space-x-1">
+        <div 
+            className="absolute z-10 bg-card p-2 rounded-lg border shadow-md flex flex-col gap-1"
+            style={{ top: position.y, left: position.x }}
+        >
+             <div 
+                className="cursor-move text-center py-1 text-muted-foreground"
+                onMouseDown={onMouseDown}
+            >
+                <Move className="w-4 h-4 mx-auto" />
+            </div>
+            <div className="flex flex-col items-center space-y-1">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -67,8 +77,7 @@ export function Toolbar() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                           <CaseSensitive className="w-4 h-4 mr-1" />
-                           <span className="text-sm">Style</span>
+                           <CaseSensitive className="w-4 h-4" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
@@ -87,9 +96,9 @@ export function Toolbar() {
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Separator orientation="vertical" className="h-6" />
+                <Separator orientation="horizontal" className="w-6" />
 
-                <ToggleGroup type="multiple" size="sm">
+                <ToggleGroup type="multiple" size="sm" orientation="vertical">
                      <ToggleGroupItem value="bold" aria-label="Toggle bold" onClick={() => editor.chain().focus().toggleBold().run()} data-active={editor.isActive('bold')}>
                         <Bold className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -104,9 +113,9 @@ export function Toolbar() {
                     </ToggleGroupItem>
                 </ToggleGroup>
                 
-                <Separator orientation="vertical" className="h-6" />
+                <Separator orientation="horizontal" className="w-6" />
 
-                <ToggleGroup type="single" size="sm">
+                <ToggleGroup type="single" size="sm" orientation="vertical">
                     <ToggleGroupItem value="bulletList" aria-label="Bullet list" onClick={() => editor.chain().focus().toggleBulletList().run()} data-active={editor.isActive('bulletList')}>
                         <List className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -115,9 +124,9 @@ export function Toolbar() {
                     </ToggleGroupItem>
                 </ToggleGroup>
                 
-                <Separator orientation="vertical" className="h-6" />
+                <Separator orientation="horizontal" className="w-6" />
                 
-                <ToggleGroup type="single" size="sm" defaultValue="left">
+                <ToggleGroup type="single" size="sm" defaultValue="left" orientation="vertical">
                     <ToggleGroupItem value="left" aria-label="Align left" onClick={() => editor.chain().focus().setTextAlign('left').run()} data-active={editor.isActive({ textAlign: 'left' })}>
                         <AlignLeft className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -132,9 +141,9 @@ export function Toolbar() {
                     </ToggleGroupItem>
                 </ToggleGroup>
 
-                 <Separator orientation="vertical" className="h-6" />
+                 <Separator orientation="horizontal" className="w-6" />
 
-                <ToggleGroup type="single" size="sm">
+                <ToggleGroup type="single" size="sm" orientation="vertical">
                     <ToggleGroupItem value="codeBlock" aria-label="Code block" onClick={() => editor.chain().focus().toggleCodeBlock().run()} data-active={editor.isActive('codeBlock')}>
                         <Code2 className="h-4 w-4" />
                     </ToggleGroupItem>
@@ -143,7 +152,7 @@ export function Toolbar() {
                     </ToggleGroupItem>
                 </ToggleGroup>
 
-                 <Separator orientation="vertical" className="h-6" />
+                 <Separator orientation="horizontal" className="w-6" />
                  
                 <LinkSelector
                     editor={editor}
