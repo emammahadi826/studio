@@ -1,4 +1,8 @@
 'use server';
+import { generateHTML } from '@tiptap/html';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
 
 import {
   generateDiagramFromNotes,
@@ -56,11 +60,24 @@ function parseDiagramLayout(layout: string): DiagramElement[] {
   return elements;
 }
 
+// Function to convert HTML to plain text
+function htmlToPlainText(html: string): Promise<string> {
+    // Tiptap's generateHTML can also be used to generate text from a JSON document,
+    // but here we use a simpler approach of creating a document from HTML and then getting text.
+    // This is a bit of a workaround because generateText is not available server-side in the same way.
+    // A more robust solution might involve a different library if complex HTML is expected.
+    
+    // For now, a simple regex-based strip should be sufficient for the AI.
+    return Promise.resolve(html.replace(/<[^>]*>?/gm, ' '));
+}
+
 export async function generateDiagramAction(
   input: GenerateDiagramFromNotesInput
 ): Promise<{ elements: DiagramElement[] }> {
   try {
-    const { diagramLayout } = await generateDiagramFromNotes(input);
+    const plainTextNotes = await htmlToPlainText(input.notes);
+    const { diagramLayout } = await generateDiagramFromNotes({ ...input, notes: plainTextNotes });
+
     if (!diagramLayout) {
        return { elements: [] };
     }
@@ -76,7 +93,8 @@ export async function suggestConnectionsAction(
   input: SuggestDiagramConnectionsInput
 ): Promise<{ connections: SuggestDiagramConnectionsOutput['connections'] }> {
   try {
-    const result = await suggestDiagramConnections(input);
+     const plainTextNotes = await htmlToPlainText(input.notes);
+    const result = await suggestDiagramConnections({ ...input, notes: plainTextNotes });
     return result || { connections: [] };
   } catch (error) {
     console.error('Error suggesting connections:', error);
