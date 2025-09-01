@@ -6,12 +6,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  projectId: "canvasnote-ycx8y",
-  appId: "1:646483323411:web:d752e3d1fd8b3c4073ade6",
-  storageBucket: "canvasnote-ycx8y.firebasestorage.app",
   apiKey: "AIzaSyDtV9gfRaeayHxr_IslIwB4QD3_FNin3h8",
   authDomain: "canvasnote-ycx8y.firebaseapp.com",
+  projectId: "canvasnote-ycx8y",
+  storageBucket: "canvasnote-ycx8y.firebasestorage.app",
   messagingSenderId: "646483323411",
+  appId: "1:646483323411:web:f9fc3fbafcfc9a8573ade6"
 };
 
 // Initialize Firebase
