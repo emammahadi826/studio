@@ -26,8 +26,8 @@ export function MainSidebar() {
       <SidebarHeader>
         <div className="flex items-center justify-between p-2">
            <Link href="/" className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-            <NotebookPen className="w-7 h-7 text-primary" />
-            <h1 className="text-lg font-semibold">CanvasNote</h1>
+            <NotebookPen className="w-6 h-6 text-primary hidden group-data-[collapsible=icon]:block" />
+            <h1 className="text-lg font-semibold group-data-[collapsible=icon]:hidden">CanvasNote</h1>
            </Link>
            <SidebarTrigger className="hidden md:flex" />
         </div>
@@ -47,8 +47,8 @@ export function MainSidebar() {
        <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Settings" size="lg">
-              <Link href="#">
+            <SidebarMenuButton asChild isActive={pathname === '/settings'} tooltip="Settings" size="lg">
+              <Link href="/settings">
                 <Settings />
                 <span className="group-data-[collapsible=icon]:hidden">Settings</span>
               </Link>
