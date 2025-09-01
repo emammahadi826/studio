@@ -19,7 +19,11 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    if (loading || !user) return;
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     
     // TODO: Replace with Firestore logic
     try {
@@ -32,7 +36,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Failed to load canvases from localStorage", error);
     }
-  }, [user, loading]);
+  }, [user, loading, router]);
 
   const handleCreateNewCanvas = () => {
     if (!user) {
@@ -68,23 +72,8 @@ export default function HomePage() {
     }
   };
 
-  if (!isMounted || loading) {
+  if (!isMounted || loading || !user) {
     return null; // or a loading spinner
-  }
-  
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] p-8 text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to CanvasNote</h1>
-        <p className="text-xl text-muted-foreground mb-8">Your unified workspace for notes and diagrams, powered by AI.</p>
-        <Button size="lg" asChild>
-          <Link href="/login">
-            <LogIn className="mr-2 h-5 w-5" />
-            Login to Get Started
-          </Link>
-        </Button>
-      </div>
-    );
   }
 
   return (
