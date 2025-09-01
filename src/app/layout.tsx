@@ -23,6 +23,7 @@ export default function RootLayout({
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   const isAuthPage = pathname === '/login' || pathname === '/signup';
+  const isCanvasPage = pathname.startsWith('/canvas/');
 
   useEffect(() => {
     setIsMounted(true);
@@ -40,7 +41,7 @@ export default function RootLayout({
       <body className="font-body antialiased">
         {isMounted ? (
           <AuthProvider>
-             {isAuthPage ? (
+             {isAuthPage || isCanvasPage ? (
                 <main className="flex-1">{children}</main>
               ) : (
                 <SidebarProvider>
