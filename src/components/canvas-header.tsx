@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Download, MoreVertical, SquarePen, Trash2, Workflow, History, Plus, Copy, Archive, Upload, Settings, Home, Eye } from 'lucide-react';
+import { Download, MoreVertical, SquarePen, Trash2, Workflow, History, Plus, Copy, Archive, Upload, Settings, Home, Eye, Edit, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -44,6 +44,10 @@ interface CanvasHeaderProps {
   canvasName: string;
   onCanvasNameChange: (name: string) => void;
   onCreateNew: () => void;
+  isEditingName: boolean;
+  onToggleEditName: (isEditing: boolean) => void;
+  editingNameValue: string;
+  onEditingNameChange: (value: string) => void;
 }
 
 export function CanvasHeader({
@@ -55,8 +59,16 @@ export function CanvasHeader({
   canvasName,
   onCanvasNameChange,
   onCreateNew,
+  isEditingName,
+  onToggleEditName,
+  editingNameValue,
+  onEditingNameChange,
 }: CanvasHeaderProps) {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+
+  const handleSaveName = () => {
+    onCanvasNameChange(editingNameValue);
+  };
 
   return (
     <header 
@@ -154,11 +166,30 @@ export function CanvasHeader({
             </AlertDialogContent>
         </AlertDialog>
 
-        <Input 
-            value={canvasName}
-            onChange={(e) => onCanvasNameChange(e.target.value)}
-            className="text-lg font-bold w-auto bg-transparent border-none focus-visible:ring-1 focus-visible:ring-offset-0"
-        />
+        {isEditingName ? (
+          <div className="flex items-center gap-2">
+            <Input 
+                value={editingNameValue}
+                onChange={(e) => onEditingNameChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                  if (e.key === 'Escape') onToggleEditName(false);
+                }}
+                className="text-lg font-bold w-auto bg-transparent border-input focus-visible:ring-1 focus-visible:ring-offset-0 h-9"
+                autoFocus
+            />
+            <Button size="icon" variant="ghost" className="h-9 w-9" onClick={handleSaveName}>
+                <Check className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold px-3 py-2">{canvasName}</h1>
+            <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => onToggleEditName(true)}>
+                <Edit className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="absolute left-1/2 -translate-x-1/2">

@@ -45,6 +45,8 @@ export default function CanvasPage() {
   const transform = canvasData?.transform || { scale: 1, dx: 0, dy: 0 };
   
   const [isMounted, setIsMounted] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState(canvasName);
 
   const [action, setAction] = useState<Action>('none');
   const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
@@ -80,9 +82,8 @@ export default function CanvasPage() {
         if (doc.exists()) {
             const data = doc.data() as Omit<CanvasData, 'id'>;
             setCanvasData(data);
+            setEditingNameValue(data.name);
         } else {
-            // This might happen briefly on new canvas creation, so we don't show an error
-            // if we already have some canvas data (likely from the creation redirect)
             if (!canvasData) {
               console.error("Canvas not found or permissions issue.");
               toast({ variant: "destructive", title: "Error", description: "This canvas does not exist or you don't have permission to view it." });
@@ -95,7 +96,7 @@ export default function CanvasPage() {
     });
 
     return () => unsubscribe();
-  }, [canvasId, user, router, toast]); // Removed canvasData dependency
+  }, [canvasId, user, router, toast]);
 
   
   // Debounced save effect
@@ -109,7 +110,6 @@ export default function CanvasPage() {
       }, { merge: true });
     } catch (error) {
       console.error("Failed to save to Firestore", error);
-      // Optional: show a toast, but might be too noisy for auto-save
     }
   }, [user, canvasId]);
 
@@ -117,7 +117,7 @@ export default function CanvasPage() {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    if (canvasData) {
+    if (canvasData && !isEditingName) { // Only auto-save when not editing the name
       saveTimeoutRef.current = setTimeout(() => {
         saveCanvas(canvasData);
       }, 500); // 500ms debounce
@@ -127,7 +127,7 @@ export default function CanvasPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [canvasData, saveCanvas]);
+  }, [canvasData, saveCanvas, isEditingName]);
 
 
   const updateCanvasData = useCallback((updates: Partial<CanvasData>) => {
@@ -136,8 +136,11 @@ export default function CanvasPage() {
         return { ...prev, ...updates };
     });
   }, []);
-
-  const handleCanvasNameChange = (name: string) => updateCanvasData({ name });
+  
+  const handleCanvasNameChange = (name: string) => {
+    updateCanvasData({ name });
+    setIsEditingName(false);
+  };
   const handleNotesChange = (notes: string) => updateCanvasData({ notes });
   const handleElementsChange = (updater: (prev: DiagramElement[]) => DiagramElement[]) => {
       updateCanvasData({ elements: updater(elements) });
@@ -187,7 +190,6 @@ export default function CanvasPage() {
           lastModified: Timestamp.now(),
       };
       
-      // Pass initial data to prevent flash of "not found"
       setCanvasData(newCanvasWithTimestamps);
       router.push(`/canvas/${docRef.id}`);
 
@@ -661,6 +663,10 @@ export default function CanvasPage() {
         canvasName={canvasName}
         onCanvasNameChange={handleCanvasNameChange}
         onCreateNew={handleCreateNewCanvas}
+        isEditingName={isEditingName}
+        onToggleEditName={setIsEditingName}
+        editingNameValue={editingNameValue}
+        onEditingNameChange={setEditingNameValue}
       />
       <div 
         className="flex-grow relative"
@@ -752,7 +758,3 @@ export default function CanvasPage() {
     </main>
   );
 }
-
-    
-
-    
