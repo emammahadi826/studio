@@ -140,6 +140,43 @@ export default function CanvasPage() {
     }
   }, [canvasId, canvasName, notes, elements, connections, toolbarPosition, transform, isMounted, user]);
   
+  const handleCreateNewCanvas = useCallback(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
+    const newCanvasId = `canvas-${Date.now()}`;
+    const newCanvas: CanvasMetadata = {
+      id: newCanvasId,
+      name: 'Untitled Canvas',
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString(),
+    };
+
+    // TODO: Replace with Firestore logic
+    try {
+      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
+      const allCanvases = allCanvasesStr ? JSON.parse(allCanvasesStr) : [];
+      const updatedCanvases = [...allCanvases, newCanvas];
+      localStorage.setItem('canvasnote-all-canvases', JSON.stringify(updatedCanvases));
+      
+      const newCanvasData = {
+        notes: '',
+        elements: [],
+        connections: [],
+        toolbarPosition: { x: 16, y: 100 },
+        transform: { scale: 1, dx: 0, dy: 0 },
+      };
+      localStorage.setItem(`canvasnote-data-${newCanvasId}`, JSON.stringify(newCanvasData));
+
+      router.push(`/canvas/${newCanvasId}`);
+    } catch (error) {
+      console.error("Failed to create new canvas in localStorage", error);
+      toast({ title: 'Error', variant: 'destructive', description: 'Could not create new canvas.'});
+    }
+  }, [user, router, toast]);
+
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
 
@@ -613,6 +650,7 @@ export default function CanvasPage() {
         onDelete={handleDeleteCanvas}
         canvasName={canvasName}
         onCanvasNameChange={setCanvasName}
+        onCreateNew={handleCreateNewCanvas}
       />
       <div 
         className="flex-grow relative"
