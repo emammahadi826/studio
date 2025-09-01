@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -10,66 +10,98 @@ import { Plus, BrainCircuit } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { CanvasMetadata } from '@/types';
 import { useAuth } from '@/context/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function HomePage() {
   const [canvases, setCanvases] = useState<CanvasMetadata[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { toast } = useToast();
+
+  const fetchCanvases = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = query(
+        collection(db, "users", user.uid, "canvases"),
+        orderBy("lastModified", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const fetchedCanvases: CanvasMetadata[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedCanvases.push({
+          id: doc.id,
+          name: data.name,
+          createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
+          lastModified: (data.lastModified as Timestamp).toDate().toISOString(),
+          userId: data.userId,
+        });
+      });
+      setCanvases(fetchedCanvases);
+    } catch (error) {
+      console.error("Failed to load canvases from Firestore", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not load your canvases." });
+    }
+  }, [user, toast]);
+
 
   useEffect(() => {
     setIsMounted(true);
-    if (loading || !user) return;
-    
-    // TODO: Replace with Firestore logic
-    try {
-      const savedCanvases = localStorage.getItem('canvasnote-all-canvases');
-      if (savedCanvases) {
-        const parsedCanvases = JSON.parse(savedCanvases) as CanvasMetadata[];
-        parsedCanvases.sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-        setCanvases(parsedCanvases);
-      }
-    } catch (error) {
-      console.error("Failed to load canvases from localStorage", error);
+    if (!loading && user) {
+      fetchCanvases();
     }
-  }, [user, loading]);
+  }, [user, loading, fetchCanvases]);
 
-  const handleCreateNewCanvas = () => {
+  const handleCreateNewCanvas = async () => {
     if (!user) {
       router.push('/login');
       return;
     }
     
-    const newCanvasId = `canvas-${Date.now()}`;
-    const newCanvas: CanvasMetadata = {
-      id: newCanvasId,
-      name: 'Untitled Canvas',
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-    };
-
-    // TODO: Replace with Firestore logic
     try {
-      const updatedCanvases = [...canvases, newCanvas];
-      localStorage.setItem('canvasnote-all-canvases', JSON.stringify(updatedCanvases));
-      
       const newCanvasData = {
+        name: 'Untitled Canvas',
         notes: '',
         elements: [],
         connections: [],
         toolbarPosition: { x: 16, y: 100 },
         transform: { scale: 1, dx: 0, dy: 0 },
+        createdAt: serverTimestamp(),
+        lastModified: serverTimestamp(),
+        userId: user.uid,
       };
-      localStorage.setItem(`canvasnote-data-${newCanvasId}`, JSON.stringify(newCanvasData));
 
-      router.push(`/canvas/${newCanvasId}`);
+      const docRef = await addDoc(collection(db, "users", user.uid, "canvases"), newCanvasData);
+      router.push(`/canvas/${docRef.id}`);
+
     } catch (error) {
-      console.error("Failed to create new canvas in localStorage", error);
+      console.error("Failed to create new canvas in Firestore", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not create a new canvas." });
     }
   };
   
-  if (!isMounted || loading || !user) {
-    return null; // or a loading spinner
+  if (!isMounted || loading) {
+    return (
+       <div className="flex flex-col p-8">
+          <header className="flex items-center justify-between mb-8">
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+          </header>
+          <section>
+            <h2 className="text-xl font-semibold mb-4">Recent Canvases</h2>
+            <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                <p className="text-muted-foreground">Loading canvases...</p>
+            </div>
+          </section>
+        </div>
+    )
+  }
+
+  if (!user) {
+      return null;
   }
 
   return (

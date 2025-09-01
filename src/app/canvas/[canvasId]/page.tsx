@@ -8,22 +8,17 @@ import { NotepadView } from '@/components/notepad-view';
 import { DiagramView } from '@/components/diagram-view';
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
-import type { DiagramElement, DiagramConnection, CanvasMetadata } from '@/types';
+import type { DiagramElement, DiagramConnection, CanvasMetadata, CanvasData } from '@/types';
 import { useAuth } from '@/context/auth-context';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, deleteDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
+
 
 export type View = 'notepad' | 'diagram';
 type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
-
-interface CanvasData {
-  notes: string;
-  elements: DiagramElement[];
-  connections: DiagramConnection[];
-  toolbarPosition: { x: number, y: number };
-  transform: { scale: number, dx: number, dy: number };
-}
 
 function isIntersecting(a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }) {
   return !(b.x > a.x + a.width || b.x + b.width < a.x || b.y > a.y + a.height || b.y + b.height < a.y);
@@ -34,17 +29,22 @@ export default function CanvasPage() {
   const canvasId = Array.isArray(params.canvasId) ? params.canvasId[0] : params.canvasId;
   const router = useRouter();
   const { user, loading } = useAuth();
+  const { toast } = useToast();
 
   const [view, setView] = useState<View>('notepad');
-  const [canvasName, setCanvasName] = useState<string>('Untitled Canvas');
-  const [notes, setNotes] = useState<string>('');
-  const [elements, setElements] = useState<DiagramElement[]>([]);
-  const [connections, setConnections] = useState<DiagramConnection[]>([]);
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 16, y: 16 });
-  const [transform, setTransform] = useState({ scale: 1, dx: 0, dy: 0 });
+  
+  // State for all canvas data
+  const [canvasData, setCanvasData] = useState<CanvasData | null>(null);
 
+  // Derived state for easier access
+  const canvasName = canvasData?.name || 'Untitled Canvas';
+  const notes = canvasData?.notes || '';
+  const elements = canvasData?.elements || [];
+  const connections = canvasData?.connections || [];
+  const toolbarPosition = canvasData?.toolbarPosition || { x: 16, y: 16 };
+  const transform = canvasData?.transform || { scale: 1, dx: 0, dy: 0 };
+  
   const [isMounted, setIsMounted] = useState(false);
-  const { toast } = useToast();
 
   const [action, setAction] = useState<Action>('none');
   const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
@@ -66,144 +66,139 @@ export default function CanvasPage() {
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    
-    setIsMounted(true);
 
-    if (!canvasId) return;
-
-    try {
-      // TODO: Replace with Firestore logic
-      // Load canvas metadata
-      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
-      if (allCanvasesStr) {
-        const allCanvases = JSON.parse(allCanvasesStr) as CanvasMetadata[];
-        const currentCanvasMeta = allCanvases.find(c => c.id === canvasId);
-        if (currentCanvasMeta) {
-          setCanvasName(currentCanvasMeta.name);
-        }
-      }
-
-      // Load canvas data
-      const savedDataStr = localStorage.getItem(`canvasnote-data-${canvasId}`);
-      if (savedDataStr) {
-        const savedData = JSON.parse(savedDataStr) as CanvasData;
-        setNotes(savedData.notes);
-        setElements(savedData.elements);
-        setConnections(savedData.connections);
-        if(savedData.toolbarPosition) setToolbarPosition(savedData.toolbarPosition);
-        if(savedData.transform) setTransform(savedData.transform);
-      } else if (canvasContainerRef.current) {
-        setToolbarPosition({ x: 16, y: canvasContainerRef.current.clientHeight / 2 - 150 });
-      }
-
-    } catch (error) {
-      console.error("Failed to load from localStorage", error);
-      toast({ variant: "destructive", title: "Error", description: "Could not load saved canvas data." });
-    }
-  }, [canvasId, toast, user, loading, router]);
-
-  useEffect(() => {
-    if (!isMounted || !canvasId || !user) return;
-    
-    // TODO: Replace with Firestore logic
-    try {
-      const dataToSave: CanvasData = {
-        notes,
-        elements,
-        connections,
-        toolbarPosition,
-        transform,
-      };
-      localStorage.setItem(`canvasnote-data-${canvasId}`, JSON.stringify(dataToSave));
-
-      // Update lastModified timestamp in metadata
-      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
-      if (allCanvasesStr) {
-          let allCanvases = JSON.parse(allCanvasesStr) as CanvasMetadata[];
-          const canvasIndex = allCanvases.findIndex(c => c.id === canvasId);
-          if (canvasIndex !== -1) {
-              allCanvases[canvasIndex].lastModified = new Date().toISOString();
-              allCanvases[canvasIndex].name = canvasName;
-              localStorage.setItem('canvasnote-all-canvases', JSON.stringify(allCanvases));
-          }
-      }
-
-    } catch (error) {
-      console.error("Failed to save to localStorage", error);
-    }
-  }, [canvasId, canvasName, notes, elements, connections, toolbarPosition, transform, isMounted, user]);
+  // --- Data handling Effects ---
   
-  const handleCreateNewCanvas = useCallback(() => {
+  // Real-time listener for canvas data
+  useEffect(() => {
+    if (!user || !canvasId) return;
+
+    const docRef = doc(db, "users", user.uid, "canvases", canvasId);
+    const unsubscribe = onSnapshot(docRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data() as Omit<CanvasData, 'id'>;
+            setCanvasData(data);
+        } else {
+            console.error("Canvas not found!");
+            toast({ variant: "destructive", title: "Error", description: "This canvas does not exist or you don't have permission to view it." });
+            router.push('/');
+        }
+    }, (error) => {
+        console.error("Error listening to canvas changes:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not connect to the canvas." });
+    });
+
+    return () => unsubscribe();
+  }, [canvasId, user, router, toast]);
+
+  
+  // Debounced save effect
+  const saveCanvas = useCallback(async (dataToSave: CanvasData) => {
+    if (!user || !canvasId) return;
+    try {
+      const docRef = doc(db, "users", user.uid, "canvases", canvasId);
+      await setDoc(docRef, {
+        ...dataToSave,
+        lastModified: serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      console.error("Failed to save to Firestore", error);
+      // Optional: show a toast, but might be too noisy for auto-save
+    }
+  }, [user, canvasId]);
+
+  useEffect(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    if (canvasData) {
+      saveTimeoutRef.current = setTimeout(() => {
+        saveCanvas(canvasData);
+      }, 500); // 500ms debounce
+    }
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [canvasData, saveCanvas]);
+
+
+  const updateCanvasData = useCallback((updates: Partial<CanvasData>) => {
+    setCanvasData(prev => {
+        if (!prev) return null;
+        return { ...prev, ...updates };
+    });
+  }, []);
+
+  const handleCanvasNameChange = (name: string) => updateCanvasData({ name });
+  const handleNotesChange = (notes: string) => updateCanvasData({ notes });
+  const handleElementsChange = (updater: (prev: DiagramElement[]) => DiagramElement[]) => {
+      updateCanvasData({ elements: updater(elements) });
+  };
+  const handleConnectionsChange = (updater: (prev: DiagramConnection[]) => DiagramConnection[]) => {
+      updateCanvasData({ connections: updater(connections) });
+  };
+  const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData({ toolbarPosition: position });
+  const handleTransformChange = (updater: (prev: { scale: number, dx: number, dy: number }) => { scale: number, dx: number, dy: number }) => {
+      updateCanvasData({ transform: updater(transform) });
+  };
+
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  
+  // --- Action Handlers ---
+
+  const handleCreateNewCanvas = useCallback(async () => {
     if (!user) {
       router.push('/login');
       return;
     }
     
-    const newCanvasId = `canvas-${Date.now()}`;
-    const newCanvas: CanvasMetadata = {
-      id: newCanvasId,
-      name: 'Untitled Canvas',
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-    };
-
-    // TODO: Replace with Firestore logic
     try {
-      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
-      const allCanvases = allCanvasesStr ? JSON.parse(allCanvasesStr) : [];
-      const updatedCanvases = [...allCanvases, newCanvas];
-      localStorage.setItem('canvasnote-all-canvases', JSON.stringify(updatedCanvases));
-      
       const newCanvasData = {
+        name: 'Untitled Canvas',
         notes: '',
         elements: [],
         connections: [],
         toolbarPosition: { x: 16, y: 100 },
         transform: { scale: 1, dx: 0, dy: 0 },
+        createdAt: serverTimestamp(),
+        lastModified: serverTimestamp(),
+        userId: user.uid,
       };
-      localStorage.setItem(`canvasnote-data-${newCanvasId}`, JSON.stringify(newCanvasData));
 
-      router.push(`/canvas/${newCanvasId}`);
+      const docRef = await addDoc(collection(db, "users", user.uid, "canvases"), newCanvasData);
+      router.push(`/canvas/${docRef.id}`);
+
     } catch (error) {
-      console.error("Failed to create new canvas in localStorage", error);
-      toast({ title: 'Error', variant: 'destructive', description: 'Could not create new canvas.'});
+      console.error("Failed to create new canvas in Firestore", error);
+      toast({ variant: "destructive", title: "Error", description: "Could not create a new canvas." });
     }
   }, [user, router, toast]);
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
 
-    setElements(prev => prev.filter(el => !selectedElementIds.includes(el.id)));
-    setConnections(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
+    handleElementsChange(prev => prev.filter(el => !selectedElementIds.includes(el.id)));
+    handleConnectionsChange(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
     setSelectedElementIds([]);
     toast({ title: 'Elements Deleted', duration: 2000 });
   }, [selectedElementIds, toast]);
 
-  const handleDeleteCanvas = useCallback(() => {
+  const handleDeleteCanvas = useCallback(async () => {
     if (!canvasId || !user) return;
     try {
-      // Remove canvas data
-      localStorage.removeItem(`canvasnote-data-${canvasId}`);
-
-      // Remove canvas from metadata list
-      const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
-      if (allCanvasesStr) {
-        let allCanvases = JSON.parse(allCanvasesStr) as CanvasMetadata[];
-        const updatedCanvases = allCanvases.filter(c => c.id !== canvasId);
-        localStorage.setItem('canvasnote-all-canvases', JSON.stringify(updatedCanvases));
-      }
-      
+      await deleteDoc(doc(db, "users", user.uid, "canvases", canvasId));
       toast({ title: 'Canvas Deleted', description: 'The canvas has been successfully deleted.' });
       router.push('/');
     } catch (error) {
-      console.error("Failed to delete canvas from localStorage", error);
+      console.error("Failed to delete canvas from Firestore", error);
       toast({ variant: "destructive", title: "Error", description: "Could not delete canvas." });
     }
   }, [canvasId, user, toast, router]);
@@ -211,7 +206,7 @@ export default function CanvasPage() {
   const cancelEditing = useCallback(() => {
     if (editingElementId && textareaRef.current) {
       const newContent = textareaRef.current.value;
-      setElements(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
+      handleElementsChange(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
     }
     setEditingElementId(null);
     setAction('none');
@@ -265,7 +260,7 @@ export default function CanvasPage() {
     try {
       const result = await generateDiagramAction({ notes });
       if (result.elements.length > 0) {
-        setElements(result.elements);
+        handleElementsChange(() => result.elements);
         toast({ title: 'Diagram Generated!', description: 'The AI has created a diagram from your notes.' });
       } else {
         toast({ variant: "destructive", title: 'Generation Failed', description: 'Could not generate a diagram. Try rephrasing your notes.' });
@@ -294,7 +289,7 @@ export default function CanvasPage() {
             });
           }
         });
-        setConnections(prev => [...prev, ...newConnections]);
+        handleConnectionsChange(prev => [...prev, ...newConnections]);
         toast({ title: 'Connections Suggested!', description: 'AI has added connections between elements.' });
       } else {
         toast({ variant: "destructive", title: 'No Connections Found', description: 'The AI could not find any clear connections to suggest.' });
@@ -445,9 +440,9 @@ export default function CanvasPage() {
         newX = Math.max(0, Math.min(newX, containerRect.width - toolbarWidth));
         newY = Math.max(0, Math.min(newY, containerRect.height - toolbarHeight));
 
-        setToolbarPosition({ x: newX, y: newY });
+        handleToolbarPositionChange({ x: newX, y: newY });
     } else if (action === 'panning' && initialState.current.initialTransform) {
-        setTransform(t => ({
+        handleTransformChange(t => ({
           ...t,
           dx: initialState.current!.initialTransform!.dx + dx,
           dy: initialState.current!.initialTransform!.dy + dy,
@@ -493,8 +488,8 @@ export default function CanvasPage() {
       setGhostElement(newElement);
 
     } else if (action === 'dragging' && selectedElementIds.length > 0 && initialState.current.elements) {
-        setElements(
-            initialState.current.elements!.map(el =>
+        handleElementsChange(() => 
+            initialState.current!.elements!.map(el =>
                 selectedElementIds.includes(el.id)
                     ? { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale, }
                     : el
@@ -502,7 +497,7 @@ export default function CanvasPage() {
         );
     } else if (action === 'resizing' && selectedElementIds.length === 1 && resizingHandle && initialState.current.elements) {
         const elementId = selectedElementIds[0];
-        setElements(prevElements =>
+        handleElementsChange(prevElements =>
             prevElements.map(el => {
                 if (el.id === elementId) {
                     const originalElement = initialState.current!.elements!.find(iel => iel.id === elementId)!;
@@ -546,7 +541,7 @@ export default function CanvasPage() {
           content: `New ${activeTool}`,
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
-        setElements(prev => [...prev, newElement]);
+        handleElementsChange(prev => [...prev, newElement]);
         setSelectedElementIds([newElement.id]);
         setEditingElementId(newElement.id);
         setAction('editing');
@@ -566,8 +561,8 @@ export default function CanvasPage() {
             target: { elementId: newElementId },
         };
 
-        setElements(prev => [...prev, finalGhost]);
-        setConnections(prev => [...prev, newConnection]);
+        handleElementsChange(prev => [...prev, finalGhost]);
+        handleConnectionsChange(prev => [...prev, newConnection]);
         setAction('none');
     } else {
         setAction('none');
@@ -596,7 +591,7 @@ export default function CanvasPage() {
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    setElements(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
+    handleElementsChange(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -605,7 +600,7 @@ export default function CanvasPage() {
         const { clientX, clientY, deltaY } = e;
         const zoomFactor = 0.0005;
         
-        setTransform(prevTransform => {
+        handleTransformChange(prevTransform => {
             const newScale = Math.max(0.1, Math.min(5, prevTransform.scale * (1 - deltaY * zoomFactor)));
         
             const containerRect = canvasContainerRef.current?.getBoundingClientRect();
@@ -622,7 +617,7 @@ export default function CanvasPage() {
         });
     } else { // Pan with mouse wheel or two-finger swipe on trackpad
         const { deltaX, deltaY } = e;
-        setTransform(prevTransform => ({
+        handleTransformChange(prevTransform => ({
             ...prevTransform,
             dx: prevTransform.dx - deltaX,
             dy: prevTransform.dy - deltaY,
@@ -632,7 +627,7 @@ export default function CanvasPage() {
 
   const paddingTop = '57px';
   
-  if (loading) {
+  if (loading || !isMounted || !canvasData) {
       return (
         <div className="flex items-center justify-center h-screen">
           <p>Loading Canvas...</p>
@@ -649,7 +644,7 @@ export default function CanvasPage() {
         onExportSVG={handleExportSVG}
         onDelete={handleDeleteCanvas}
         canvasName={canvasName}
-        onCanvasNameChange={setCanvasName}
+        onCanvasNameChange={handleCanvasNameChange}
         onCreateNew={handleCreateNewCanvas}
       />
       <div 
@@ -658,7 +653,7 @@ export default function CanvasPage() {
         ref={canvasContainerRef}
       >
           <div className={`w-full h-full transition-opacity duration-300 ease-in-out ${view === 'notepad' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <NotepadView content={notes} onContentChange={setNotes} />
+            <NotepadView content={notes} onContentChange={handleNotesChange} />
           </div>
           <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             style={{ top: paddingTop }}

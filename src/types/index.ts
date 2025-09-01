@@ -1,10 +1,12 @@
 
+import { Timestamp } from "firebase/firestore";
+
 export interface CanvasMetadata {
   id: string;
   name: string;
-  createdAt: string;
-  lastModified: string;
-  userId?: string;
+  createdAt: Timestamp | string;
+  lastModified: Timestamp | string;
+  userId: string;
 }
 
 export interface DiagramElement {
@@ -26,4 +28,16 @@ export interface DiagramConnection {
   target: {
     elementId: string;
   };
+}
+
+export interface CanvasData {
+    name: string;
+    notes: string;
+    elements: DiagramElement[];
+    connections: DiagramConnection[];
+    toolbarPosition: { x: number, y: number };
+    transform: { scale: number, dx: number, dy: number };
+    createdAt: Timestamp;
+    lastModified: Timestamp;
+    userId: string;
 }
