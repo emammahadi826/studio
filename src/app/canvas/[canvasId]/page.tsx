@@ -98,7 +98,9 @@ export default function CanvasPage() {
         if (doc.exists()) {
             const data = doc.data() as Omit<CanvasData, 'id'>;
             setCanvasData(data);
-            setEditingNameValue(data.name);
+            if (!isEditingName) {
+              setEditingNameValue(data.name);
+            }
         } else {
             if (!canvasData) {
               console.error("Canvas not found or permissions issue.");
@@ -112,7 +114,7 @@ export default function CanvasPage() {
     });
 
     return () => unsubscribe();
-  }, [canvasId, user, router, toast]);
+  }, [canvasId, user, router, toast, isEditingName]);
 
   
   // Debounced save effect
@@ -123,12 +125,15 @@ export default function CanvasPage() {
     const cleanData = JSON.parse(JSON.stringify(dataToSave));
 
     // Sanitize elements to remove any undefined `backgroundColor` fields
-    cleanData.elements = cleanData.elements.map((el: DiagramElement) => {
-      if (el.backgroundColor === undefined) {
-        delete el.backgroundColor;
-      }
-      return el;
-    });
+    if (cleanData.elements) {
+      cleanData.elements = cleanData.elements.map((el: DiagramElement) => {
+        if (el.backgroundColor === undefined) {
+          delete el.backgroundColor;
+        }
+        return el;
+      });
+    }
+
 
     try {
       const docRef = doc(db, "users", user.uid, "canvases", canvasId);
@@ -145,7 +150,7 @@ export default function CanvasPage() {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    if (canvasData && !isEditingName) { // Only auto-save when not editing the name
+    if (canvasData) { 
       saveTimeoutRef.current = setTimeout(() => {
         saveCanvas(canvasData);
       }, 500); // 500ms debounce
@@ -155,7 +160,7 @@ export default function CanvasPage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [canvasData, saveCanvas, isEditingName]);
+  }, [canvasData, saveCanvas]);
 
 
   const updateCanvasData = useCallback((updates: Partial<CanvasData>) => {
@@ -611,13 +616,38 @@ export default function CanvasPage() {
     }
     if (action === 'drawing' && initialState.current?.currentPath) {
         const { id, points } = initialState.current.currentPath;
-        handleElementsChange(prev => prev.map(el => 
-            el.id === id ? { ...el, ...getBoundsForDrawing(points) } : el
-        ));
+        if (points.length > 1) {
+            handleElementsChange(prev => prev.map(el => 
+                el.id === id ? { ...el, ...getBoundsForDrawing(points) } : el
+            ));
+        } else {
+            // If it's just a click, remove the temporary drawing element
+            handleElementsChange(prev => prev.filter(el => el.id !== id));
+        }
         setAction('none');
     }
-    else if (action === 'creatingShape' && ghostElement && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
-      if (ghostElement.width > 5 && ghostElement.height > 5) {
+    else if (action === 'creatingShape' && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
+      // If the user didn't drag to create a shape, create a default-sized one
+      if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
+          const defaultWidth = 150;
+          const defaultHeight = activeTool === 'sticky-note' ? 150 : (activeTool === 'text' ? 40 : 80);
+          const newElement: DiagramElement = {
+              ...ghostElement,
+              id: `el-${Date.now()}`,
+              content: `New ${activeTool}`,
+              width: defaultWidth,
+              height: defaultHeight,
+              x: ghostElement.x - defaultWidth / 2, // Center it on the cursor
+              y: ghostElement.y - defaultHeight / 2,
+              backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
+          };
+          handleElementsChange(prev => [...prev, newElement]);
+          setSelectedElementIds([newElement.id]);
+          setEditingElementId(newElement.id);
+          setAction('editing');
+      } 
+      // If they did drag, create the shape with the dragged dimensions
+      else if (ghostElement) {
         const newElement: DiagramElement = {
           ...ghostElement,
           id: `el-${Date.now()}`,
