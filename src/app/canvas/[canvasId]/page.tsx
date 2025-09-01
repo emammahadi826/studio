@@ -95,12 +95,12 @@ export default function CanvasPage() {
     });
 
     return () => unsubscribe();
-  }, [canvasId, user, router, toast, canvasData]);
+  }, [canvasId, user, router, toast]); // Removed canvasData dependency
 
   
   // Debounced save effect
-  const saveCanvas = useCallback(async (dataToSave: Partial<CanvasData>) => {
-    if (!user || !canvasId || !canvasData) return;
+  const saveCanvas = useCallback(async (dataToSave: CanvasData) => {
+    if (!user || !canvasId) return;
     try {
       const docRef = doc(db, "users", user.uid, "canvases", canvasId);
       await setDoc(docRef, {
@@ -111,7 +111,7 @@ export default function CanvasPage() {
       console.error("Failed to save to Firestore", error);
       // Optional: show a toast, but might be too noisy for auto-save
     }
-  }, [user, canvasId, canvasData]);
+  }, [user, canvasId]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -137,10 +137,7 @@ export default function CanvasPage() {
     });
   }, []);
 
-  const handleCanvasNameChange = (name: string) => {
-    updateCanvasData({ name });
-    saveCanvas({ name });
-  };
+  const handleCanvasNameChange = (name: string) => updateCanvasData({ name });
   const handleNotesChange = (notes: string) => updateCanvasData({ notes });
   const handleElementsChange = (updater: (prev: DiagramElement[]) => DiagramElement[]) => {
       updateCanvasData({ elements: updater(elements) });
@@ -207,7 +204,7 @@ export default function CanvasPage() {
     handleConnectionsChange(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
     setSelectedElementIds([]);
     toast({ title: 'Elements Deleted', duration: 2000 });
-  }, [selectedElementIds, toast]);
+  }, [selectedElementIds, toast, handleElementsChange, handleConnectionsChange]);
 
   const handleDeleteCanvas = useCallback(async () => {
     if (!canvasId || !user) return;
@@ -228,7 +225,7 @@ export default function CanvasPage() {
     }
     setEditingElementId(null);
     setAction('none');
-  }, [editingElementId]);
+  }, [editingElementId, handleElementsChange]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -286,7 +283,7 @@ export default function CanvasPage() {
     } catch (error) {
       toast({ variant: "destructive", title: 'Error', description: 'An error occurred while generating the diagram.' });
     }
-  }, [notes, toast]);
+  }, [notes, toast, handleElementsChange]);
 
   const handleSuggestConnections = useCallback(async () => {
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
@@ -315,7 +312,7 @@ export default function CanvasPage() {
     } catch (error) {
       toast({ variant: "destructive", title: 'Error', description: 'An error occurred while suggesting connections.' });
     }
-  }, [notes, elements, toast]);
+  }, [notes, elements, toast, handleConnectionsChange]);
 
   const handleExportMarkdown = useCallback(() => {
     const blob = new Blob([notes], { type: 'text/markdown' });
@@ -755,5 +752,7 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    
 
     
