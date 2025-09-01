@@ -1,11 +1,12 @@
 
 "use client";
 
-import { EditorProvider, EditorProviderProps } from "@tiptap/react";
+import { EditorProvider, EditorProviderProps, useCurrentEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Toolbar } from "./toolbar";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
+import Placeholder from '@tiptap/extension-placeholder'
 import "./editor.css";
 import { useState, useRef } from "react";
 
@@ -27,6 +28,9 @@ const extensions = [
     alignments: ["left", "center", "right", "justify"],
     defaultAlignment: "left",
   }),
+  Placeholder.configure({
+    placeholder: 'Start typing here...',
+  })
 ];
 
 export function Editor(props: EditorProps) {
@@ -54,7 +58,7 @@ export function Editor(props: EditorProps) {
         if (editorContainerRef.current) {
             const containerRect = editorContainerRef.current.getBoundingClientRect();
             const toolbarWidth = 450; 
-            const toolbarHeight = 52;
+            const toolbarHeight = 40;
 
             let newX = dragStartPos.current.toolbarX + dx;
             let newY = dragStartPos.current.toolbarY + dy;
@@ -73,7 +77,7 @@ export function Editor(props: EditorProps) {
     };
 
     return (
-        <div ref={editorContainerRef} className="w-full h-full flex flex-col relative rounded-lg border bg-background focus-within:ring-2 focus-within:ring-ring">
+        <div ref={editorContainerRef} className="w-full h-full flex flex-col relative bg-background">
             <EditorProvider
                 extensions={extensions}
                 {...props}
