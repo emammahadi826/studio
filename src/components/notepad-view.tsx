@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Editor } from "./editor/editor";
@@ -13,7 +14,7 @@ export function NotepadView({ content, onContentChange }: NotepadViewProps) {
       <div className="w-full h-full max-w-4xl mx-auto">
         <Editor
             content={content}
-            onUpdate={(editor) => {
+            onUpdate={({ editor }) => {
                 onContentChange(editor.getHTML());
             }}
         />
