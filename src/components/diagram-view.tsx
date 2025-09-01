@@ -24,6 +24,21 @@ function getSvgPathFromStroke(stroke: {x:number, y:number}[]) {
   return d;
 }
 
+function getBoundsForDrawing(points: {x: number, y: number}[]) {
+    if (!points || points.length === 0) {
+        return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    points.forEach(p => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+    });
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+
 function DiagramToolbar({ 
     onToolSelect, 
     activeTool,
@@ -120,11 +135,13 @@ function Element({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   
+  const bounds = element.type === 'drawing' ? getBoundsForDrawing(element.points) : element;
+
   const commonProps = {
-    x: element.x,
-    y: element.y,
-    width: element.width,
-    height: element.height,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
   };
   
   const styleProps = {
@@ -166,22 +183,22 @@ function Element({
 
   const handleSize = 8 / transform.scale;
   const handles: { position: ResizingHandle; cursor: string; x: number; y: number }[] = [
-    { position: 'top-left', cursor: 'nwse-resize', x: element.x - handleSize/2, y: element.y - handleSize/2 },
-    { position: 'top-right', cursor: 'nesw-resize', x: element.x + element.width - handleSize/2, y: element.y - handleSize/2 },
-    { position: 'bottom-left', cursor: 'nesw-resize', x: element.x - handleSize/2, y: element.y + element.height - handleSize/2 },
-    { position: 'bottom-right', cursor: 'nwse-resize', x: element.x + element.width - handleSize/2, y: element.y + element.height - handleSize/2 },
-    { position: 'top', cursor: 'ns-resize', x: element.x + element.width / 2 - handleSize / 2, y: element.y - handleSize/2 },
-    { position: 'bottom', cursor: 'ns-resize', x: element.x + element.width / 2 - handleSize / 2, y: element.y + element.height - handleSize/2 },
-    { position: 'left', cursor: 'ew-resize', x: element.x - handleSize/2, y: element.y + element.height / 2 - handleSize / 2 },
-    { position: 'right', cursor: 'ew-resize', x: element.x + element.width - handleSize/2, y: element.y + element.height / 2 - handleSize / 2 },
+    { position: 'top-left', cursor: 'nwse-resize', x: bounds.x - handleSize/2, y: bounds.y - handleSize/2 },
+    { position: 'top-right', cursor: 'nesw-resize', x: bounds.x + bounds.width - handleSize/2, y: bounds.y - handleSize/2 },
+    { position: 'bottom-left', cursor: 'nesw-resize', x: bounds.x - handleSize/2, y: bounds.y + bounds.height - handleSize/2 },
+    { position: 'bottom-right', cursor: 'nwse-resize', x: bounds.x + bounds.width - handleSize/2, y: bounds.y + bounds.height - handleSize/2 },
+    { position: 'top', cursor: 'ns-resize', x: bounds.x + bounds.width / 2 - handleSize / 2, y: bounds.y - handleSize/2 },
+    { position: 'bottom', cursor: 'ns-resize', x: bounds.x + bounds.width / 2 - handleSize / 2, y: bounds.y + bounds.height - handleSize/2 },
+    { position: 'left', cursor: 'ew-resize', x: bounds.x - handleSize/2, y: bounds.y + bounds.height / 2 - handleSize / 2 },
+    { position: 'right', cursor: 'ew-resize', x: bounds.x + bounds.width - handleSize/2, y: bounds.y + bounds.height / 2 - handleSize / 2 },
   ];
 
   const anchorSize = 10;
   const anchors: { side: AnchorSide, x: number, y: number }[] = [
-      { side: 'top', x: element.x + element.width / 2 - anchorSize/2, y: element.y - anchorSize/2 },
-      { side: 'right', x: element.x + element.width - anchorSize/2, y: element.y + element.height/2 - anchorSize/2 },
-      { side: 'bottom', x: element.x + element.width / 2 - anchorSize/2, y: element.y + element.height - anchorSize/2 },
-      { side: 'left', x: element.x - anchorSize/2, y: element.y + element.height/2 - anchorSize/2 },
+      { side: 'top', x: bounds.x + bounds.width / 2 - anchorSize/2, y: bounds.y - anchorSize/2 },
+      { side: 'right', x: bounds.x + bounds.width - anchorSize/2, y: bounds.y + bounds.height/2 - anchorSize/2 },
+      { side: 'bottom', x: bounds.x + bounds.width / 2 - anchorSize/2, y: bounds.y + bounds.height - anchorSize/2 },
+      { side: 'left', x: bounds.x - anchorSize/2, y: bounds.y + bounds.height/2 - anchorSize/2 },
   ];
   
   const handleMouseDown = (e: React.MouseEvent<any>) => onMouseDown(e, element.id)
@@ -199,12 +216,12 @@ function Element({
       case 'circle':
         return (
           <>
-            <ellipse cx={element.x + element.width / 2} cy={element.y + element.height / 2} rx={element.width / 2} ry={element.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
             <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       case 'diamond':
-        const { x, y, width, height } = element;
+        const { x, y, width, height } = bounds;
         const points = `${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}`;
         return (
           <>
@@ -213,7 +230,7 @@ function Element({
           </>
         );
       case 'triangle': {
-        const { x, y, width, height } = element;
+        const { x, y, width, height } = bounds;
         const points = `${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`;
         return (
           <>
@@ -223,7 +240,7 @@ function Element({
         );
       }
       case 'cylinder': {
-        const { x, y, width, height } = element;
+        const { x, y, width, height } = bounds;
         const ellipseHeight = Math.min(height * 0.3, 20);
         return (
           <>
@@ -252,8 +269,8 @@ function Element({
       case 'sticky-note':
         return (
           <>
-            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            <foreignObject {...commonProps} transform={`rotate(-2 ${element.x + element.width/2} ${element.y + element.height/2})`}>{stickyNoteTextDiv}</foreignObject>
+            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            <foreignObject {...commonProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`}>{stickyNoteTextDiv}</foreignObject>
           </>
         );
       case 'text':
@@ -295,26 +312,44 @@ function Element({
   return (
     <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       {renderElement()}
-      {isSelected && !isEditing && element.type !== 'drawing' && handles.map(handle => (
-          <rect
-              key={handle.position}
-              x={handle.x}
-              y={handle.y}
-              width={handleSize}
-              height={handleSize}
-              fill="hsla(var(--background), 0.5)"
-              stroke="hsl(var(--primary))"
-              strokeWidth={1 / transform.scale}
-              cursor={handle.cursor}
-              onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
-          />
-      ))}
+      {isSelected && !isEditing && (
+        <>
+            {element.type !== 'drawing' && handles.map(handle => (
+                <rect
+                    key={handle.position}
+                    x={handle.x}
+                    y={handle.y}
+                    width={handleSize}
+                    height={handleSize}
+                    fill="hsla(var(--background), 0.5)"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={1 / transform.scale}
+                    cursor={handle.cursor}
+                    onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
+                />
+            ))}
+            {element.type === 'drawing' && (
+                 <rect
+                    x={bounds.x}
+                    y={bounds.y}
+                    width={bounds.width}
+                    height={bounds.height}
+                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={1.5 / transform.scale}
+                    strokeDasharray={`${4 / transform.scale}`}
+                    rx={4 / transform.scale} ry={4 / transform.scale}
+                    style={{ pointerEvents: 'none' }}
+                />
+            )}
+        </>
+      )}
        {isHovered && !isSelected && !isEditing && element.type !== 'drawing' && (
         <rect
-          x={element.x}
-          y={element.y}
-          width={element.width}
-          height={element.height}
+          x={bounds.x}
+          y={bounds.y}
+          width={bounds.width}
+          height={bounds.height}
           fill="transparent"
           stroke="hsl(var(--primary))"
           strokeWidth={1 / transform.scale}
@@ -416,10 +451,13 @@ function Connection({ connection, elements, transform }: { connection: DiagramCo
 
     if (!sourceEl || !targetEl) return null;
 
-    const x1 = sourceEl.x + sourceEl.width / 2;
-    const y1 = sourceEl.y + sourceEl.height / 2;
-    const x2 = targetEl.x + targetEl.width / 2;
-    const y2 = targetEl.y + targetEl.height / 2;
+    const sourceBounds = sourceEl.type === 'drawing' ? getBoundsForDrawing(sourceEl.points) : sourceEl;
+    const targetBounds = targetEl.type === 'drawing' ? getBoundsForDrawing(targetEl.points) : targetEl;
+    
+    const x1 = sourceBounds.x + sourceBounds.width / 2;
+    const y1 = sourceBounds.y + sourceBounds.height / 2;
+    const x2 = targetBounds.x + targetBounds.width / 2;
+    const y2 = targetBounds.y + targetBounds.height / 2;
 
     return (
         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--foreground))" strokeWidth={2 / transform.scale} markerEnd="url(#arrowhead)" />

@@ -20,10 +20,6 @@ type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' 
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
 
-function isIntersecting(a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }) {
-  return !(b.x > a.x + a.width || b.x + b.width < a.x || b.y > a.y + a.height || b.y + b.height < a.y);
-}
-
 function getBoundsForDrawing(points: {x: number, y: number}[]) {
     if (!points || points.length === 0) {
         return { x: 0, y: 0, width: 0, height: 0 };
@@ -36,6 +32,11 @@ function getBoundsForDrawing(points: {x: number, y: number}[]) {
         maxY = Math.max(maxY, p.y);
     });
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function isIntersecting(a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }) {
+  const aBounds = 'points' in a ? getBoundsForDrawing((a as any).points) : a;
+  return !(b.x > aBounds.x + aBounds.width || b.x + b.width < aBounds.x || b.y > aBounds.y + aBounds.height || b.y + b.height < aBounds.y);
 }
 
 
@@ -175,12 +176,12 @@ export default function CanvasPage() {
     setIsEditingName(false);
   };
   const handleNotesChange = (notes: string) => updateCanvasData({ notes });
-  const handleElementsChange = (updater: (prev: DiagramElement[]) => DiagramElement[]) => {
+  const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[]) => {
       updateCanvasData({ elements: updater(elements) });
-  };
-  const handleConnectionsChange = (updater: (prev: DiagramConnection[]) => DiagramConnection[]) => {
+  }, [elements, updateCanvasData]);
+  const handleConnectionsChange = useCallback((updater: (prev: DiagramConnection[]) => DiagramConnection[]) => {
       updateCanvasData({ connections: updater(connections) });
-  };
+  }, [connections, updateCanvasData]);
   const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData({ toolbarPosition: position });
   const handleTransformChange = (updater: (prev: { scale: number, dx: number, dy: number }) => { scale: number, dx: number, dy: number }) => {
       updateCanvasData({ transform: updater(transform) });
@@ -526,15 +527,12 @@ export default function CanvasPage() {
         const currentMarqueeRect = { x, y, width, height };
         setMarqueeRect(currentMarqueeRect);
 
-        const intersectingIds = elements.filter(el => {
-             if (el.type === 'drawing') {
-                return isIntersecting(getBoundsForDrawing(el.points), currentMarqueeRect);
-            }
-            return isIntersecting(el, currentMarqueeRect)
-        }).map(el => el.id);
+        const intersectingIds = elements.filter(el => isIntersecting(el, currentMarqueeRect)).map(el => el.id);
+        
         setSelectedElementIds(ids => {
             const baseIds = e.shiftKey ? ids.filter(id => !intersectingIds.includes(id)) : [];
-            return [...new Set([...baseIds, ...intersectingIds])];
+            const newIds = e.shiftKey ? [...intersectingIds, ...ids.filter(id => intersectingIds.includes(id))] : intersectingIds;
+            return [...new Set([...baseIds, ...newIds])];
         });
 
     } else if (action === 'creatingShape' && activeTool && ghostElement && activeTool !== 'pen' && activeTool !== 'pan') {
@@ -570,7 +568,8 @@ export default function CanvasPage() {
                             x: p.x + dx / transform.scale,
                             y: p.y + dy / transform.scale,
                         }));
-                        return { ...el, type: 'drawing', points: newPoints, ...getBoundsForDrawing(newPoints) };
+                        const bounds = getBoundsForDrawing(newPoints);
+                        return { ...el, type: 'drawing', points: newPoints, ...bounds };
                     }
                     return { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale };
                 }
@@ -730,7 +729,7 @@ export default function CanvasPage() {
         
             return { scale: newScale, dx: newDx, dy: newDy };
         });
-    } else { // Pan with mouse wheel or two-finger swipe on trackpad
+    } else { // Pan with mouse wheel or two-finger swipe on trackpads
         const { deltaX, deltaY } = e;
         handleTransformChange(prevTransform => ({
             ...prevTransform,
