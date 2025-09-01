@@ -260,19 +260,33 @@ function Element({
         return (
             <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>{textDiv}</foreignObject>
         );
-      case 'drawing':
+      case 'drawing': {
         if (!element.points || element.points.length === 0) return null;
+        const pathData = getSvgPathFromStroke(element.points);
         return (
-          <path
-            d={getSvgPathFromStroke(element.points)}
-            stroke="hsl(var(--foreground))"
-            fill="none"
-            strokeWidth={3 / transform.scale}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ pointerEvents: 'none' }}
-          />
+          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} cursor="move">
+            {/* Wider, transparent path for easier selection */}
+            <path
+              d={pathData}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={20 / transform.scale}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* The visible path */}
+            <path
+              d={pathData}
+              fill="none"
+              stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}
+              strokeWidth={isSelected ? 4 / transform.scale : 3 / transform.scale}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ pointerEvents: 'none' }}
+            />
+          </g>
         );
+      }
       default:
         return null;
     }

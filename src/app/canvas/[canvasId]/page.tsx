@@ -24,6 +24,21 @@ function isIntersecting(a: { x: number, y: number, width: number, height: number
   return !(b.x > a.x + a.width || b.x + b.width < a.x || b.y > a.y + a.height || b.y + b.height < a.y);
 }
 
+function getBoundsForDrawing(points: {x: number, y: number}[]) {
+    if (!points || points.length === 0) {
+        return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    points.forEach(p => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+    });
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+
 export default function CanvasPage() {
   const params = useParams();
   const canvasId = Array.isArray(params.canvasId) ? params.canvasId[0] : params.canvasId;
@@ -506,7 +521,12 @@ export default function CanvasPage() {
         const currentMarqueeRect = { x, y, width, height };
         setMarqueeRect(currentMarqueeRect);
 
-        const intersectingIds = elements.filter(el => isIntersecting(el, currentMarqueeRect)).map(el => el.id);
+        const intersectingIds = elements.filter(el => {
+             if (el.type === 'drawing') {
+                return isIntersecting(getBoundsForDrawing(el.points), currentMarqueeRect);
+            }
+            return isIntersecting(el, currentMarqueeRect)
+        }).map(el => el.id);
         setSelectedElementIds(ids => {
             const baseIds = e.shiftKey ? ids.filter(id => !intersectingIds.includes(id)) : [];
             return [...new Set([...baseIds, ...intersectingIds])];
@@ -538,11 +558,19 @@ export default function CanvasPage() {
 
     } else if (action === 'dragging' && selectedElementIds.length > 0 && initialState.current.elements) {
         handleElementsChange(() => 
-            initialState.current!.elements!.map(el =>
-                selectedElementIds.includes(el.id)
-                    ? { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale, }
-                    : el
-            )
+            initialState.current!.elements!.map(el => {
+                if (selectedElementIds.includes(el.id)) {
+                    if (el.type === 'drawing') {
+                        const newPoints = el.points.map(p => ({
+                            x: p.x + dx / transform.scale,
+                            y: p.y + dy / transform.scale,
+                        }));
+                        return { ...el, type: 'drawing', points: newPoints, ...getBoundsForDrawing(newPoints) };
+                    }
+                    return { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale };
+                }
+                return el;
+            })
         );
     } else if (action === 'resizing' && selectedElementIds.length === 1 && resizingHandle && initialState.current.elements) {
         const elementId = selectedElementIds[0];
@@ -581,8 +609,14 @@ export default function CanvasPage() {
         }
         return;
     }
-    
-    if (action === 'creatingShape' && ghostElement && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
+    if (action === 'drawing' && initialState.current?.currentPath) {
+        const { id, points } = initialState.current.currentPath;
+        handleElementsChange(prev => prev.map(el => 
+            el.id === id ? { ...el, ...getBoundsForDrawing(points) } : el
+        ));
+        setAction('none');
+    }
+    else if (action === 'creatingShape' && ghostElement && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
       if (ghostElement.width > 5 && ghostElement.height > 5) {
         const newElement: DiagramElement = {
           ...ghostElement,
@@ -626,6 +660,8 @@ export default function CanvasPage() {
   };
 
   const handleElementDoubleClick = (elementId: string) => {
+    const el = elements.find(e => e.id === elementId);
+    if (el?.type === 'drawing') return;
     cancelEditing(); 
     setAction('editing');
     setEditingElementId(elementId);
