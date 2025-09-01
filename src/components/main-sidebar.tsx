@@ -68,9 +68,9 @@ export function MainSidebar() {
                 <Link href="/profile">
                   <Avatar className="size-7">
                     <AvatarImage src={user.photoURL || "https://picsum.photos/100"} />
-                    <AvatarFallback>{user.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
+                    <AvatarFallback>{user.displayName?.[0].toUpperCase() || user.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
                   </Avatar>
-                  <span className="group-data-[collapsible=icon]:hidden">Profile</span>
+                  <span className="group-data-[collapsible=icon]:hidden">{user.displayName || user.email}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

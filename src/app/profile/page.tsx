@@ -1,11 +1,28 @@
+
 "use client"
 
+import { useAuth } from "@/context/auth-context"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function ProfilePage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return <div>Loading...</div>; // Or a skeleton loader
+  }
+
   return (
     <div className="p-8 space-y-8">
         <div>
@@ -18,14 +35,14 @@ export default function ProfilePage() {
             <CardHeader>
                 <div className="flex items-start gap-6">
                     <Avatar className="h-24 w-24">
-                        <AvatarImage src="https://picsum.photos/100" alt="User avatar" data-ai-hint="profile avatar" />
-                        <AvatarFallback>U</AvatarFallback>
+                        <AvatarImage src={user.photoURL || "https://picsum.photos/100"} alt="User avatar" data-ai-hint="profile avatar" />
+                        <AvatarFallback>{user.displayName?.[0].toUpperCase() || user.email?.[0].toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="flex-grow">
                         <div className="flex justify-between items-center">
                             <div>
-                                <CardTitle className="text-3xl">Your Name</CardTitle>
-                                <CardDescription>your.email@example.com</CardDescription>
+                                <CardTitle className="text-3xl">{user.displayName || 'Your Name'}</CardTitle>
+                                <CardDescription>{user.email}</CardDescription>
                             </div>
                             <Button variant="outline">Edit Profile</Button>
                         </div>
