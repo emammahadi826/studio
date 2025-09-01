@@ -9,16 +9,19 @@ export interface CanvasMetadata {
   userId: string;
 }
 
-export interface DiagramElement {
+export type DiagramElement = {
   id: string;
-  type: 'rectangle' | 'circle' | 'sticky-note' | 'text' | 'diamond' | 'triangle' | 'cylinder';
   x: number;
   y: number;
   width: number;
   height: number;
   content: string;
   backgroundColor?: string;
-}
+} & (
+  | { type: 'rectangle' | 'circle' | 'diamond' | 'triangle' | 'cylinder' | 'sticky-note' | 'text' }
+  | { type: 'drawing', points: {x: number, y: number}[] }
+)
+
 
 export interface DiagramConnection {
   id: string;

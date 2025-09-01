@@ -2,11 +2,27 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Move } from 'lucide-react';
+import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Move, MousePointer2, Pen, Hand } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DiagramElement, DiagramConnection } from '@/types';
 import { cn } from '@/lib/utils';
+import { Separator } from './ui/separator';
+
+function getSvgPathFromStroke(stroke: {x:number, y:number}[]) {
+  if (!stroke || stroke.length === 0) return "";
+  const d = stroke.reduce(
+    (acc, { x, y }, i, a) => {
+      if (i === 0) return `M ${x},${y}`;
+      const [lastX, lastY] = [a[i-1].x, a[i-1].y];
+      const [nextX, nextY] = [a[i+1]?.x, a[i+1]?.y];
+      const C = (p1:number, p2:number) => (p1 + p2) / 2;
+      return `${acc} Q ${lastX},${lastY} ${C(lastX,x)},${C(lastY,y)}`;
+    },
+    ""
+  );
+  return d;
+}
 
 function DiagramToolbar({ 
     onToolSelect, 
@@ -14,12 +30,15 @@ function DiagramToolbar({
     position,
     onMouseDown,
 }: { 
-    onToolSelect: (type: DiagramElement['type']) => void, 
-    activeTool: DiagramElement['type'] | null 
+    onToolSelect: (type: DiagramElement['type'] | 'pen' | 'pan' | null) => void, 
+    activeTool: DiagramElement['type'] | 'pen' | 'pan' | null,
     position: { x: number, y: number },
     onMouseDown: (e: React.MouseEvent) => void,
 }) {
   const tools = [
+    { type: null, icon: MousePointer2, label: 'Select' },
+    { type: 'pan', icon: Hand, label: 'Pan' },
+    { type: 'pen', icon: Pen, label: 'Pen' },
     { type: 'rectangle', icon: Square, label: 'Rectangle' },
     { type: 'circle', icon: Circle, label: 'Circle' },
     { type: 'diamond', icon: Diamond, label: 'Diamond' },
@@ -41,7 +60,25 @@ function DiagramToolbar({
         <Move className="w-4 h-4 mx-auto" />
       </div>
       <TooltipProvider delayDuration={0}>
-        {tools.map((tool) => (
+        {tools.slice(0, 3).map((tool) => (
+          <Tooltip key={tool.label}>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => onToolSelect(tool.type)}
+                className={cn(activeTool === tool.type && 'bg-accent')}
+              >
+                <tool.icon className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{tool.label}</p>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+        <Separator className="my-1" />
+        {tools.slice(3).map((tool) => (
           <Tooltip key={tool.type}>
             <TooltipTrigger asChild>
               <Button 
@@ -223,6 +260,19 @@ function Element({
         return (
             <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>{textDiv}</foreignObject>
         );
+      case 'drawing':
+        if (!element.points || element.points.length === 0) return null;
+        return (
+          <path
+            d={getSvgPathFromStroke(element.points)}
+            stroke="hsl(var(--foreground))"
+            fill="none"
+            strokeWidth={3 / transform.scale}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ pointerEvents: 'none' }}
+          />
+        );
       default:
         return null;
     }
@@ -231,7 +281,7 @@ function Element({
   return (
     <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       {renderElement()}
-      {isSelected && !isEditing && handles.map(handle => (
+      {isSelected && !isEditing && element.type !== 'drawing' && handles.map(handle => (
           <rect
               key={handle.position}
               x={handle.x}
@@ -245,7 +295,7 @@ function Element({
               onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
           />
       ))}
-       {isHovered && !isSelected && !isEditing && (
+       {isHovered && !isSelected && !isEditing && element.type !== 'drawing' && (
         <rect
           x={element.x}
           y={element.y}
@@ -263,7 +313,7 @@ function Element({
 }
 
 function GhostElement({ element, transform }: { element: DiagramElement | null, transform: { scale: number } }) {
-    if (!element) return null;
+    if (!element || element.type === 'drawing') return null;
 
     const commonProps = {
         fill: "hsla(var(--primary), 0.2)",
@@ -367,10 +417,10 @@ interface DiagramViewProps {
   connections: DiagramConnection[];
   ghostElement: DiagramElement | null;
   marqueeRect: { x: number; y: number; width: number; height: number; } | null;
-  onToolSelect: (type: DiagramElement['type']) => void;
+  onToolSelect: (type: DiagramElement['type'] | 'pen' | 'pan' | null) => void;
   onCanvasMouseDown: (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
   selectedElementIds: string[];
-  activeTool: DiagramElement['type'] | null;
+  activeTool: DiagramElement['type'] | 'pen' | 'pan' | null;
   editingElementId: string | null;
   onElementDoubleClick: (elementId: string) => void;
   toolbarPosition: { x: number; y: number; };

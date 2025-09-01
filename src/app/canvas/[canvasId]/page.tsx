@@ -15,7 +15,7 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, deleteDoc, collection
 
 
 export type View = 'notepad' | 'diagram';
-type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
+type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar' | 'drawing';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
@@ -49,7 +49,7 @@ export default function CanvasPage() {
   const [editingNameValue, setEditingNameValue] = useState(canvasName);
 
   const [action, setAction] = useState<Action>('none');
-  const [activeTool, setActiveTool] = useState<DiagramElement['type'] | null>(null);
+  const [activeTool, setActiveTool] = useState<DiagramElement['type'] | 'pen' | 'pan' | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [resizingHandle, setResizingHandle] = useState<ResizingHandle | null>(null);
@@ -65,6 +65,7 @@ export default function CanvasPage() {
     toolbarX?: number;
     toolbarY?: number;
     initialTransform?: { scale: number, dx: number, dy: number };
+    currentPath?: { id: string, points: { x: number, y: number }[] };
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -280,7 +281,7 @@ export default function CanvasPage() {
     };
   };
 
-  const handleToolSelect = (type: DiagramElement['type']) => {
+  const handleToolSelect = (type: DiagramElement['type'] | 'pen' | 'pan' | null) => {
     setActiveTool(type);
   };
   
@@ -302,7 +303,7 @@ export default function CanvasPage() {
   const handleSuggestConnections = useCallback(async () => {
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
     try {
-      const elementIdentifiers = elements.map(el => el.content); 
+      const elementIdentifiers = elements.map(el => el.content).filter(Boolean); 
       const result = await suggestConnectionsAction({ notes, diagramElements: elementIdentifiers });
       
       if (result.connections.length > 0) {
@@ -382,7 +383,7 @@ export default function CanvasPage() {
     const { clientX: mouseX, clientY: mouseY } = e;
     const canvasCoords = screenToCanvas(mouseX, mouseY);
 
-    if (e.button === 1 || e.metaKey || e.ctrlKey) { 
+    if (e.button === 1 || e.metaKey || e.ctrlKey || activeTool === 'pan') { 
       e.preventDefault();
       setAction('panning');
       initialState.current = { 
@@ -395,7 +396,20 @@ export default function CanvasPage() {
     
     initialState.current = { mouseX, mouseY };
 
-    if (activeTool) {
+    if (activeTool === 'pen') {
+      setAction('drawing');
+      const newPath = { id: `el-${Date.now()}`, points: [canvasCoords] };
+      initialState.current.currentPath = newPath;
+      const newDrawingElement: DiagramElement = {
+        id: newPath.id,
+        type: 'drawing',
+        points: newPath.points,
+        x: 0, y: 0, width: 0, height: 0, // These will be calculated later
+        content: '',
+      };
+      handleElementsChange(prev => [...prev, newDrawingElement]);
+      return;
+    } else if (activeTool) {
       setAction('creatingShape');
       setGhostElement({
         id: 'ghost',
@@ -456,7 +470,13 @@ export default function CanvasPage() {
     const dy = clientY - initialState.current.mouseY;
     const canvasCoords = screenToCanvas(clientX, clientY);
 
-    if (action === 'draggingToolbar') {
+    if (action === 'drawing' && initialState.current.currentPath) {
+      const { id, points } = initialState.current.currentPath;
+      const newPoints = [...points, canvasCoords];
+      initialState.current.currentPath.points = newPoints;
+      handleElementsChange(prev => prev.map(el => el.id === id ? { ...el, type: 'drawing', points: newPoints } : el));
+
+    } else if (action === 'draggingToolbar') {
         if (!canvasContainerRef.current || initialState.current.toolbarX === undefined || initialState.current.toolbarY === undefined) return;
         
         const containerRect = canvasContainerRef.current.getBoundingClientRect();
@@ -492,7 +512,7 @@ export default function CanvasPage() {
             return [...new Set([...baseIds, ...intersectingIds])];
         });
 
-    } else if (action === 'creatingShape' && activeTool && ghostElement) {
+    } else if (action === 'creatingShape' && activeTool && ghostElement && activeTool !== 'pen' && activeTool !== 'pan') {
         if (!initialState.current) return;
         const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
         const newElement: DiagramElement = {
@@ -562,7 +582,7 @@ export default function CanvasPage() {
         return;
     }
     
-    if (action === 'creatingShape' && ghostElement && activeTool) {
+    if (action === 'creatingShape' && ghostElement && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
       if (ghostElement.width > 5 && ghostElement.height > 5) {
         const newElement: DiagramElement = {
           ...ghostElement,
@@ -654,6 +674,12 @@ export default function CanvasPage() {
     }
   };
 
+  const getCursor = () => {
+    if (activeTool === 'pan' || action === 'panning') return 'grabbing';
+    if (activeTool) return 'crosshair';
+    return 'default';
+  }
+
   const paddingTop = '57px';
   
   if (loading || !isMounted || !canvasData) {
@@ -698,7 +724,7 @@ export default function CanvasPage() {
           >
             <div 
               className="w-full h-full"
-              style={{ cursor: activeTool ? 'crosshair' : (action === 'panning' ? 'grabbing' : 'default') }}
+              style={{ cursor: getCursor() }}
             >
               <DiagramView 
                   elements={elements} 
