@@ -84,3 +84,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .tiptap {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+  }
+  .tiptap::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+  }
+}
