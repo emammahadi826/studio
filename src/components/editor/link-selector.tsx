@@ -16,6 +16,8 @@ import {
 import { Button } from "../ui/button";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { useCallback, useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
+import { Input } from "../ui/input";
 
 export const LinkSelector = ({
   editor,
@@ -60,37 +62,43 @@ export const LinkSelector = ({
           <Link className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-60 p-2">
-        <div className="flex p-1">
-          <input
-            autoFocus
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            type="url"
-            placeholder="Paste a link"
-            className="flex-1 bg-transparent p-1 text-sm outline-none"
-            onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                    applyLink(url);
-                }
-            }}
-          />
-          {editor.getAttributes("link").href ? (
-            <Button
-              size="icon"
-              variant="outline"
-              type="button"
-              className="flex h-8 items-center rounded-sm p-1 text-red-500"
-              onClick={() => removeLink()}
-            >
-             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-unlink-2"><path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"/></svg>
-            </Button>
-          ) : (
-             <Button size="icon" className="h-8" onClick={() => applyLink(url)}>
-                <Check className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+      <PopoverContent align="start" className="w-80 p-0 border-0">
+          <DialogContent className="p-4 relative">
+             <DialogHeader>
+                <DialogTitle>Edit Link</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center gap-2">
+              <Input
+                autoFocus
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                type="url"
+                placeholder="https://example.com"
+                className="flex-1"
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyLink(url);
+                    }
+                }}
+              />
+            </div>
+            <DialogFooter className="!justify-between">
+                {editor.getAttributes("link").href ? (
+                    <Button
+                    variant="outline"
+                    type="button"
+                    className="text-red-500 border-red-500/50 hover:bg-red-500/10 hover:text-red-500"
+                    onClick={() => removeLink()}
+                    >
+                    Remove link
+                    </Button>
+                ) : <div />}
+                <Button size="sm" onClick={() => applyLink(url)}>
+                    Apply
+                </Button>
+            </DialogFooter>
+          </DialogContent>
       </PopoverContent>
     </Popover>
   );
