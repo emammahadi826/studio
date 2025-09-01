@@ -607,7 +607,7 @@ export default function CanvasPage() {
                   editingElementId={editingElementId}
                   onElementDoubleClick={handleElementDoubleClick}
                   toolbarPosition={toolbarPosition}
-                  onToolbarMouseDown={onToolbarMouseDown}
+                  onToolbarMouseDown={handleToolbarMouseDown}
                   transform={transform}
               />
             </div>
