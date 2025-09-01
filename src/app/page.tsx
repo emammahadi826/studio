@@ -74,7 +74,7 @@ export default function HomePage() {
   
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen p-8 text-center">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] p-8 text-center">
         <h1 className="text-4xl font-bold mb-4">Welcome to CanvasNote</h1>
         <p className="text-xl text-muted-foreground mb-8">Your unified workspace for notes and diagrams, powered by AI.</p>
         <Button size="lg" asChild>
