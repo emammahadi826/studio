@@ -608,14 +608,9 @@ export default function CanvasPage() {
       <CanvasHeader
         view={view}
         onViewChange={setView}
-        onGenerateDiagram={handleGenerateDiagram}
-        onSuggestConnections={handleSuggestConnections}
         onExportMarkdown={handleExportMarkdown}
         onExportSVG={handleExportSVG}
         onDelete={handleDeleteCanvas}
-        isDiagramView={view === 'diagram'}
-        canSuggestConnections={elements.length >= 2}
-        canGenerateDiagram={notes.trim().length > 0}
         canvasName={canvasName}
         onCanvasNameChange={setCanvasName}
       />

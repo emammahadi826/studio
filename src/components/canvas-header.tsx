@@ -1,7 +1,7 @@
 
 "use client";
 
-import { BrainCircuit, Download, MoreVertical, SquarePen, Trash2, Workflow } from 'lucide-react';
+import { Download, MoreVertical, SquarePen, Trash2, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSidebar } from './ui/sidebar';
 import { Input } from './ui/input';
 import {
@@ -33,14 +32,9 @@ export type View = 'notepad' | 'diagram';
 interface CanvasHeaderProps {
   view: View;
   onViewChange: (view: View) => void;
-  onGenerateDiagram: () => void;
-  onSuggestConnections: () => void;
   onExportMarkdown: () => void;
   onExportSVG: () => void;
   onDelete: () => void;
-  isDiagramView: boolean;
-  canSuggestConnections: boolean;
-  canGenerateDiagram: boolean;
   canvasName: string;
   onCanvasNameChange: (name: string) => void;
 }
@@ -48,14 +42,9 @@ interface CanvasHeaderProps {
 export function CanvasHeader({
   view,
   onViewChange,
-  onGenerateDiagram,
-  onSuggestConnections,
   onExportMarkdown,
   onExportSVG,
   onDelete,
-  isDiagramView,
-  canSuggestConnections,
-  canGenerateDiagram,
   canvasName,
   onCanvasNameChange,
 }: CanvasHeaderProps) {
@@ -87,51 +76,6 @@ export function CanvasHeader({
         </Tabs>
       </div>
       <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <BrainCircuit className="w-4 h-4 mr-2" />
-              AI Tools
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={!isDiagramView || !canGenerateDiagram ? 'cursor-not-allowed' : ''}>
-                    <DropdownMenuItem 
-                      onClick={onGenerateDiagram} 
-                      disabled={!isDiagramView || !canGenerateDiagram}
-                    >
-                      Generate Diagram from Notes
-                    </DropdownMenuItem>
-                  </div>
-                </TooltipTrigger>
-                {!isDiagramView && <TooltipContent><p>Switch to Diagram view to use this feature.</p></TooltipContent>}
-                {isDiagramView && !canGenerateDiagram && <TooltipContent><p>Write some notes first.</p></TooltipContent>}
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-               <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={!isDiagramView || !canSuggestConnections ? 'cursor-not-allowed' : ''}>
-                    <DropdownMenuItem 
-                      onClick={onSuggestConnections}
-                      disabled={!isDiagramView || !canSuggestConnections}
-                    >
-                      Suggest Connections
-                    </DropdownMenuItem>
-                  </div>
-                </TooltipTrigger>
-                {!isDiagramView && <TooltipContent><p>Switch to Diagram view to use this feature.</p></TooltipContent>}
-                {isDiagramView && !canSuggestConnections && <TooltipContent><p>Add at least two elements to the diagram.</p></TooltipContent>}
-              </Tooltip>
-            </TooltipProvider>
-
-          </DropdownMenuContent>
-        </DropdownMenu>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
