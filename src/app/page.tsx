@@ -6,17 +6,22 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, BrainCircuit } from 'lucide-react';
+import { Plus, BrainCircuit, LogIn } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { CanvasMetadata } from '@/types';
+import { useAuth } from '@/context/auth-context';
 
 export default function HomePage() {
   const [canvases, setCanvases] = useState<CanvasMetadata[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     setIsMounted(true);
+    if (loading || !user) return;
+    
+    // TODO: Replace with Firestore logic
     try {
       const savedCanvases = localStorage.getItem('canvasnote-all-canvases');
       if (savedCanvases) {
@@ -27,9 +32,14 @@ export default function HomePage() {
     } catch (error) {
       console.error("Failed to load canvases from localStorage", error);
     }
-  }, []);
+  }, [user, loading]);
 
   const handleCreateNewCanvas = () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
     const newCanvasId = `canvas-${Date.now()}`;
     const newCanvas: CanvasMetadata = {
       id: newCanvasId,
@@ -38,6 +48,7 @@ export default function HomePage() {
       lastModified: new Date().toISOString(),
     };
 
+    // TODO: Replace with Firestore logic
     try {
       const updatedCanvases = [...canvases, newCanvas];
       localStorage.setItem('canvasnote-all-canvases', JSON.stringify(updatedCanvases));
@@ -57,8 +68,23 @@ export default function HomePage() {
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || loading) {
     return null; // or a loading spinner
+  }
+  
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen p-8 text-center">
+        <h1 className="text-4xl font-bold mb-4">Welcome to CanvasNote</h1>
+        <p className="text-xl text-muted-foreground mb-8">Your unified workspace for notes and diagrams, powered by AI.</p>
+        <Button size="lg" asChild>
+          <Link href="/login">
+            <LogIn className="mr-2 h-5 w-5" />
+            Login to Get Started
+          </Link>
+        </Button>
+      </div>
+    );
   }
 
   return (

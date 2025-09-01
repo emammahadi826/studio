@@ -4,6 +4,7 @@ export interface CanvasMetadata {
   name: string;
   createdAt: string;
   lastModified: string;
+  userId?: string;
 }
 
 export interface DiagramElement {

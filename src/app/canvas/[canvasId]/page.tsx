@@ -2,13 +2,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { CanvasHeader } from '@/components/canvas-header';
 import { NotepadView } from '@/components/notepad-view';
 import { DiagramView } from '@/components/diagram-view';
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection, CanvasMetadata } from '@/types';
+import { useAuth } from '@/context/auth-context';
 
 export type View = 'notepad' | 'diagram';
 type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar';
@@ -31,6 +32,8 @@ function isIntersecting(a: { x: number, y: number, width: number, height: number
 export default function CanvasPage() {
   const params = useParams();
   const canvasId = params.canvasId as string;
+  const router = useRouter();
+  const { user, loading } = useAuth();
 
   const [view, setView] = useState<View>('notepad');
   const [canvasName, setCanvasName] = useState<string>('Untitled Canvas');
@@ -65,9 +68,18 @@ export default function CanvasPage() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!canvasId) return;
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    
     setIsMounted(true);
+
+    if (!canvasId) return;
+
     try {
+      // TODO: Replace with Firestore logic
       // Load canvas metadata
       const allCanvasesStr = localStorage.getItem('canvasnote-all-canvases');
       if (allCanvasesStr) {
@@ -95,10 +107,12 @@ export default function CanvasPage() {
       console.error("Failed to load from localStorage", error);
       toast({ variant: "destructive", title: "Error", description: "Could not load saved canvas data." });
     }
-  }, [canvasId, toast]);
+  }, [canvasId, toast, user, loading, router]);
 
   useEffect(() => {
-    if (!isMounted || !canvasId) return;
+    if (!isMounted || !canvasId || !user) return;
+    
+    // TODO: Replace with Firestore logic
     try {
       const dataToSave: CanvasData = {
         notes,
@@ -124,7 +138,7 @@ export default function CanvasPage() {
     } catch (error) {
       console.error("Failed to save to localStorage", error);
     }
-  }, [canvasId, canvasName, notes, elements, connections, toolbarPosition, transform, isMounted]);
+  }, [canvasId, canvasName, notes, elements, connections, toolbarPosition, transform, isMounted, user]);
   
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
@@ -557,9 +571,16 @@ export default function CanvasPage() {
     }
   };
 
-
   const paddingTop = '57px';
   
+  if (loading) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <p>Loading Canvas...</p>
+        </div>
+      )
+  }
+
   return (
     <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
       <CanvasHeader

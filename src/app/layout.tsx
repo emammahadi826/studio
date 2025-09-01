@@ -6,6 +6,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { MainSidebar } from '@/components/main-sidebar';
+import { AuthProvider } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
 
 // export const metadata: Metadata = {
@@ -35,22 +36,22 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         {isMounted ? (
-          <SidebarProvider>
-            <MainSidebar />
-            <SidebarInset>
-              <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
-                <SidebarTrigger />
-              </header>
-              <main className="flex-1">
-                  {children}
-              </main>
-            </SidebarInset>
-            <Toaster />
-          </SidebarProvider>
+          <AuthProvider>
+            <SidebarProvider>
+              <MainSidebar />
+              <SidebarInset>
+                <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
+                  <SidebarTrigger />
+                </header>
+                <main className="flex-1">
+                    {children}
+                </main>
+              </SidebarInset>
+              <Toaster />
+            </SidebarProvider>
+          </AuthProvider>
         ) : null}
       </body>
     </html>
   );
 }
-
-    
