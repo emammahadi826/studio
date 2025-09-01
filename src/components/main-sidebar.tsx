@@ -33,7 +33,7 @@ export function MainSidebar() {
       <SidebarContent>
         <SidebarMenu>
           <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Dashboard">
+              <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Dashboard" size="sm">
                 <Link href="/">
                   <Home />
                   <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
