@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, BrainCircuit } from 'lucide-react';
+import { Plus, BrainCircuit, NotebookPen } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { CanvasMetadata, CanvasData } from '@/types';
 import { useAuth } from '@/context/auth-context';
@@ -141,23 +141,17 @@ export default function HomePage() {
       <section>
         <h2 className="text-xl font-semibold mb-4">Recent Canvases</h2>
         {canvases.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="flex flex-col gap-4">
             {canvases.map((canvas) => (
               <Link href={`/canvas/${canvas.id}`} key={canvas.id}>
-                <Card className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="truncate">{canvas.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                     <div 
-                        className="aspect-video bg-secondary rounded-md mb-4 flex items-center justify-center"
-                      >
-                       <p className="text-xs text-muted-foreground">No preview</p>
-                      </div>
-                    <p className="text-sm text-muted-foreground">
-                      Last updated: {formatDistanceToNow(new Date(canvas.lastModified), { addSuffix: true })}
-                    </p>
-                  </CardContent>
+                <Card className="hover:shadow-lg transition-shadow p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <NotebookPen className="h-6 w-6 text-primary" />
+                    <span className="font-semibold">{canvas.name}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Last updated: {formatDistanceToNow(new Date(canvas.lastModified), { addSuffix: true })}
+                  </p>
                 </Card>
               </Link>
             ))}
@@ -172,5 +166,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
