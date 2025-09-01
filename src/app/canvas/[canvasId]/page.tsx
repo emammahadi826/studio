@@ -102,10 +102,22 @@ export default function CanvasPage() {
   // Debounced save effect
   const saveCanvas = useCallback(async (dataToSave: CanvasData) => {
     if (!user || !canvasId) return;
+
+    // Create a deep copy to avoid mutating the state directly
+    const cleanData = JSON.parse(JSON.stringify(dataToSave));
+
+    // Sanitize elements to remove any undefined `backgroundColor` fields
+    cleanData.elements = cleanData.elements.map((el: DiagramElement) => {
+      if (el.backgroundColor === undefined) {
+        delete el.backgroundColor;
+      }
+      return el;
+    });
+
     try {
       const docRef = doc(db, "users", user.uid, "canvases", canvasId);
       await setDoc(docRef, {
-        ...dataToSave,
+        ...cleanData,
         lastModified: serverTimestamp(),
       }, { merge: true });
     } catch (error) {
