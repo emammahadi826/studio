@@ -33,11 +33,19 @@ export default function HomePage() {
       const fetchedCanvases: CanvasMetadata[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        // Ensure createdAt and lastModified are valid Timestamps before converting
+        const createdAt = data.createdAt && typeof data.createdAt.toDate === 'function' 
+            ? data.createdAt.toDate().toISOString() 
+            : new Date().toISOString();
+        const lastModified = data.lastModified && typeof data.lastModified.toDate === 'function' 
+            ? data.lastModified.toDate().toISOString() 
+            : new Date().toISOString();
+
         fetchedCanvases.push({
           id: doc.id,
           name: data.name,
-          createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
-          lastModified: (data.lastModified as Timestamp).toDate().toISOString(),
+          createdAt: createdAt,
+          lastModified: lastModified,
           userId: data.userId,
         });
       });
