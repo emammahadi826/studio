@@ -1,3 +1,4 @@
+
 'use server';
 import { generateHTML } from '@tiptap/html';
 import StarterKit from '@tiptap/starter-kit';
@@ -17,33 +18,29 @@ import type { DiagramElement, DiagramConnection } from '@/types';
 
 function parseDiagramLayout(layout: string): DiagramElement[] {
   const elements: DiagramElement[] = [];
+  if (!layout) return elements;
+
   const lines = layout.split('\n').filter(line => line.trim() !== '');
   let idCounter = Date.now();
 
   lines.forEach((line, index) => {
-    const rectMatch = line.match(/rectangle with text ['"](.*?)['"]/i);
-    const circleMatch = line.match(/circle with text ['"](.*?)['"]/i);
-    const noteMatch = line.match(/sticky note with text ['"](.*?)['"]/i);
-    const textMatch = line.match(/text label ['"](.*?)['"]/i);
-
+    const lowerLine = line.toLowerCase();
     let type: DiagramElement['type'] | null = null;
-    let content = '';
+    
+    // More robust matching for element types
+    if (lowerLine.includes('rectangle')) type = 'rectangle';
+    else if (lowerLine.includes('circle')) type = 'circle';
+    else if (lowerLine.includes('diamond')) type = 'diamond';
+    else if (lowerLine.includes('triangle')) type = 'triangle';
+    else if (lowerLine.includes('cylinder')) type = 'cylinder';
+    else if (lowerLine.includes('sticky note')) type = 'sticky-note';
+    else if (lowerLine.includes('text label')) type = 'text';
 
-    if (rectMatch) {
-      type = 'rectangle';
-      content = rectMatch[1];
-    } else if (circleMatch) {
-      type = 'circle';
-      content = circleMatch[1];
-    } else if (noteMatch) {
-      type = 'sticky-note';
-      content = noteMatch[1];
-    } else if (textMatch) {
-      type = 'text';
-      content = textMatch[1];
-    }
+    // Extract content within quotes
+    const contentMatch = line.match(/['"](.*?)['"]/);
+    const content = contentMatch ? contentMatch[1] : line;
 
-    if (type && content) {
+    if (type) {
       elements.push({
         id: `el-${idCounter++}`,
         type,
@@ -71,23 +68,40 @@ function htmlToPlainText(html: string): Promise<string> {
     return Promise.resolve(html.replace(/<[^>]*>?/gm, ' '));
 }
 
-export async function generateDiagramAction(
-  input: GenerateDiagramFromNotesInput
-): Promise<{ elements: DiagramElement[] }> {
+async function tryGenerateDiagram(input: GenerateDiagramFromNotesInput, retries = 1): Promise<{ elements: DiagramElement[] }> {
   try {
     const plainTextNotes = await htmlToPlainText(input.notes);
     const { diagramLayout } = await generateDiagramFromNotes({ ...input, notes: plainTextNotes });
 
     if (!diagramLayout) {
+       if (retries > 0) {
+           return tryGenerateDiagram(input, retries - 1);
+       }
        return { elements: [] };
     }
+    
     const elements = parseDiagramLayout(diagramLayout);
+    
+    if (elements.length === 0 && retries > 0) {
+        return tryGenerateDiagram(input, retries - 1);
+    }
+
     return { elements };
   } catch (error) {
     console.error('Error generating diagram:', error);
+    if (retries > 0) {
+        return tryGenerateDiagram(input, retries - 1);
+    }
     return { elements: [] };
   }
 }
+
+export async function generateDiagramAction(
+  input: GenerateDiagramFromNotesInput
+): Promise<{ elements: DiagramElement[] }> {
+    return tryGenerateDiagram(input, 1); // Allow one retry
+}
+
 
 export async function suggestConnectionsAction(
   input: SuggestDiagramConnectionsInput
