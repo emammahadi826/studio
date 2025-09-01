@@ -36,11 +36,16 @@ export default function SignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
-      toast({ title: 'Success!', description: 'Account created successfully. Please log in.' });
-      router.push('/login');
-    } catch (err: any) {
-      setError(err.message);
-      toast({ variant: 'destructive', title: 'Error', description: err.message });
+      toast({ title: 'Success!', description: 'Account created successfully.' });
+      router.push('/');
+    } catch (err: any)      {
+      if (err.code === 'auth/email-already-in-use') {
+        setError('This email address is already in use.');
+        toast({ variant: 'destructive', title: 'Error', description: 'This email address is already in use.' });
+      } else {
+        setError(err.message);
+        toast({ variant: 'destructive', title: 'Error', description: err.message });
+      }
     }
   };
 
