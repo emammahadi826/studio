@@ -7,10 +7,18 @@
   margin-top: 0.75em;
 }
 
-.tiptap ul,
+.tiptap ul {
+  padding: 0 1rem;
+  list-style-type: disc;
+  list-style-position: inside;
+}
+
 .tiptap ol {
   padding: 0 1rem;
+  list-style-type: decimal;
+  list-style-position: inside;
 }
+
 
 .tiptap h1,
 .tiptap h2,
