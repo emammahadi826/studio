@@ -25,6 +25,10 @@
   display: list-item;
 }
 
+.tiptap li > p {
+  display: inline;
+}
+
 .tiptap h1,
 .tiptap h2,
 .tiptap h3,
