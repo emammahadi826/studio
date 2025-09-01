@@ -31,7 +31,7 @@ function isIntersecting(a: { x: number, y: number, width: number, height: number
 
 export default function CanvasPage() {
   const params = useParams();
-  const canvasId = params.canvasId as string;
+  const canvasId = Array.isArray(params.canvasId) ? params.canvasId[0] : params.canvasId;
   const router = useRouter();
   const { user, loading } = useAuth();
 
