@@ -81,9 +81,13 @@ export default function CanvasPage() {
             const data = doc.data() as Omit<CanvasData, 'id'>;
             setCanvasData(data);
         } else {
-            console.error("Canvas not found!");
-            toast({ variant: "destructive", title: "Error", description: "This canvas does not exist or you don't have permission to view it." });
-            router.push('/');
+            // This might happen briefly on new canvas creation, so we don't show an error
+            // if we already have some canvas data (likely from the creation redirect)
+            if (!canvasData) {
+              console.error("Canvas not found or permissions issue.");
+              toast({ variant: "destructive", title: "Error", description: "This canvas does not exist or you don't have permission to view it." });
+              router.push('/');
+            }
         }
     }, (error) => {
         console.error("Error listening to canvas changes:", error);
@@ -91,7 +95,7 @@ export default function CanvasPage() {
     });
 
     return () => unsubscribe();
-  }, [canvasId, user, router, toast]);
+  }, [canvasId, user, router, toast, canvasData]);
 
   
   // Debounced save effect
@@ -161,19 +165,30 @@ export default function CanvasPage() {
     }
     
     try {
-      const newCanvasData = {
+      const newCanvasData: Omit<CanvasData, 'createdAt' | 'lastModified'> = {
         name: 'Untitled Canvas',
         notes: '',
         elements: [],
         connections: [],
         toolbarPosition: { x: 16, y: 100 },
         transform: { scale: 1, dx: 0, dy: 0 },
-        createdAt: serverTimestamp(),
-        lastModified: serverTimestamp(),
         userId: user.uid,
       };
 
-      const docRef = await addDoc(collection(db, "users", user.uid, "canvases"), newCanvasData);
+      const docRef = await addDoc(collection(db, "users", user.uid, "canvases"), {
+        ...newCanvasData,
+        createdAt: serverTimestamp(),
+        lastModified: serverTimestamp(),
+      });
+      
+      const newCanvasWithTimestamps: CanvasData = {
+          ...newCanvasData,
+          createdAt: Timestamp.now(),
+          lastModified: Timestamp.now(),
+      };
+      
+      // Pass initial data to prevent flash of "not found"
+      setCanvasData(newCanvasWithTimestamps);
       router.push(`/canvas/${docRef.id}`);
 
     } catch (error) {
@@ -737,3 +752,5 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    

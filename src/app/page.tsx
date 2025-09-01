@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, BrainCircuit } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import type { CanvasMetadata } from '@/types';
+import type { CanvasMetadata, CanvasData } from '@/types';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
@@ -63,19 +63,21 @@ export default function HomePage() {
     }
     
     try {
-      const newCanvasData = {
+      const newCanvasData: Omit<CanvasData, 'createdAt' | 'lastModified'> = {
         name: 'Untitled Canvas',
         notes: '',
         elements: [],
         connections: [],
         toolbarPosition: { x: 16, y: 100 },
         transform: { scale: 1, dx: 0, dy: 0 },
-        createdAt: serverTimestamp(),
-        lastModified: serverTimestamp(),
         userId: user.uid,
       };
 
-      const docRef = await addDoc(collection(db, "users", user.uid, "canvases"), newCanvasData);
+      const docRef = await addDoc(collection(db, "users", user.uid, "canvases"), {
+          ...newCanvasData,
+          createdAt: serverTimestamp(),
+          lastModified: serverTimestamp(),
+      });
       router.push(`/canvas/${docRef.id}`);
 
     } catch (error) {
@@ -162,3 +164,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
