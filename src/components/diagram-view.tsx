@@ -192,14 +192,14 @@ function Element({
         return (
           <>
             <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            {textElement}
+            
           </>
         );
       case 'circle':
         return (
           <>
             <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            {textElement}
+            
           </>
         );
       case 'diamond':
@@ -208,7 +208,7 @@ function Element({
         return (
           <>
             <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            {textElement}
+            
           </>
         );
       case 'triangle': {
@@ -217,7 +217,7 @@ function Element({
         return (
           <>
             <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            {textElement}
+            
           </>
         );
       }
@@ -244,7 +244,7 @@ function Element({
                 />
                 <rect {...commonProps} fill="transparent" />
             </g>
-            {textElement}
+            
           </>
         );
       }
@@ -252,14 +252,14 @@ function Element({
         return (
           <>
             <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            {textElement}
+            
           </>
         );
       case 'text':
         return (
             <>
                 <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}></foreignObject>
-                {textElement}
+                
             </>
         );
       case 'drawing': {
@@ -462,6 +462,7 @@ interface DiagramViewProps {
   toolbarPosition: { x: number; y: number; };
   onToolbarMouseDown: (e: React.MouseEvent) => void;
   transform: { scale: number, dx: number, dy: number };
+  onWheel: (e: React.WheelEvent) => void;
 }
 
 export function DiagramView({ 
@@ -478,6 +479,7 @@ export function DiagramView({
     toolbarPosition,
     onToolbarMouseDown,
     transform,
+    onWheel,
 }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
@@ -498,6 +500,7 @@ export function DiagramView({
                 onCanvasMouseDown(e, null);
             }
         }}
+        onWheel={onWheel}
         >
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto" markerUnits="strokeWidth">
@@ -526,3 +529,5 @@ export function DiagramView({
     </div>
   );
 }
+
+    

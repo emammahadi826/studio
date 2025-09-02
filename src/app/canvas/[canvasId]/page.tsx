@@ -67,7 +67,7 @@ export default function CanvasPage() {
   const transform = canvasData?.transform || { scale: 1, dx: 0, dy: 0 };
   
   const [isMounted, setIsMounted] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(isEditingName);
   const [editingNameValue, setEditingNameValue] = useState(canvasName);
 
   const [action, setAction] = useState<Action>('none');
@@ -182,6 +182,7 @@ export default function CanvasPage() {
                   elements: updates.elements !== undefined ? updates.elements : prev.elements,
                   connections: updates.connections !== undefined ? updates.connections : prev.connections,
               };
+              // If we are undoing/redoing, we slice the history
               const newHistory = history.slice(0, historyIndex + 1);
               newHistory.push(newEntry);
               setHistory(newHistory);
@@ -200,36 +201,12 @@ export default function CanvasPage() {
   const handleNotesChange = (notes: string) => updateCanvasData({ notes });
   
   const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[], addToHistory = false) => {
-      setCanvasData(prev => {
-        if (!prev) return null;
-        const newElements = updater(prev.elements);
-        if (addToHistory) {
-            const newEntry: HistoryEntry = { elements: newElements, connections: prev.connections };
-            const newHistory = history.slice(0, historyIndex + 1);
-            newHistory.push(newEntry);
-            setHistory(newHistory);
-            setHistoryIndex(newHistory.length - 1);
-        }
-        setIsDirty(true);
-        return { ...prev, elements: newElements };
-      });
-  }, [history, historyIndex]);
+      updateCanvasData(prev => ({ elements: updater(prev.elements) }), addToHistory);
+  }, [updateCanvasData]);
 
   const handleConnectionsChange = useCallback((updater: (prev: DiagramConnection[]) => DiagramConnection[], addToHistory = false) => {
-      setCanvasData(prev => {
-        if (!prev) return null;
-        const newConnections = updater(prev.connections);
-         if (addToHistory) {
-            const newEntry: HistoryEntry = { elements: prev.elements, connections: newConnections };
-            const newHistory = history.slice(0, historyIndex + 1);
-            newHistory.push(newEntry);
-            setHistory(newHistory);
-            setHistoryIndex(newHistory.length - 1);
-        }
-        setIsDirty(true);
-        return { ...prev, connections: newConnections };
-      });
-  }, [history, historyIndex]);
+      updateCanvasData(prev => ({ connections: updater(prev.connections) }), addToHistory);
+  }, [updateCanvasData]);
 
   const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData({ toolbarPosition: position });
   const handleTransformChange = (updater: (prev: { scale: number, dx: number, dy: number }) => { scale: number, dx: number, dy: number }) => {
@@ -886,11 +863,10 @@ export default function CanvasPage() {
   
   const diagramView = (
     <div className="w-full h-full relative"
-      onMouseMove={handleCanvasMouseMove} 
-      onMouseUp={handleCanvasMouseUp} 
-      onMouseLeave={handleCanvasMouseUp}
-      onClick={handleCanvasClick}
-      onWheel={handleWheel}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={handleCanvasMouseUp}
+        onClick={handleCanvasClick}
     >
       <div 
         className="w-full h-full"
@@ -910,6 +886,7 @@ export default function CanvasPage() {
             toolbarPosition={toolbarPosition}
             onToolbarMouseDown={handleToolbarMouseDown}
             transform={transform}
+            onWheel={handleWheel}
         />
       </div>
        {action === 'editing' && editingElementId && (
@@ -999,7 +976,7 @@ export default function CanvasPage() {
         {view === 'canvas' && diagramView}
         {view === 'both' && (
           <>
-            <div className="w-1/2 h-full">{notepad}</div>
+            <div className="w-1/2 h-full overflow-y-auto">{notepad}</div>
             <Separator orientation="vertical" />
             <div className="w-1/2 h-full">{diagramView}</div>
           </>
@@ -1008,3 +985,5 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    
