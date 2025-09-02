@@ -553,7 +553,8 @@ export default function CanvasPage() {
         newY = Math.max(0, Math.min(newY, containerRect.height - toolbarHeight));
 
         handleToolbarPositionChange({ x: newX, y: newY });
-    } else if (action === 'panning' && initialState.current.initialTransform) {
+    } else if (action === 'panning') {
+        if (!initialState.current?.initialTransform) return;
         handleTransformChange(t => ({
           ...t,
           dx: initialState.current!.initialTransform!.dx + dx,
@@ -942,3 +943,5 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    
