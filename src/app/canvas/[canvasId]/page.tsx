@@ -5,19 +5,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { CanvasHeader } from '@/components/canvas-header';
 import { NotepadView } from '@/components/notepad-view';
-import { DiagramView } from '@/components/diagram-view';
+import { DiagramView, ResizingHandle } from '@/components/diagram-view';
 import { useToast } from '@/hooks/use-toast';
 import { generateDiagramAction, suggestConnectionsAction } from '@/lib/actions';
 import type { DiagramElement, DiagramConnection, CanvasMetadata, CanvasData } from '@/types';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, deleteDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
-import { Separator } from '@/components/ui/separator';
 
 
 export type View = 'document' | 'canvas' | 'both';
 type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar' | 'drawing';
-type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
 interface HistoryEntry {
@@ -67,8 +65,9 @@ export default function CanvasPage() {
   const transform = canvasData?.transform || { scale: 1, dx: 0, dy: 0 };
   
   const [isMounted, setIsMounted] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(isMounted);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState(canvasName);
+  const [cursor, setCursor] = useState('default');
 
   const [action, setAction] = useState<Action>('none');
   const [activeTool, setActiveTool] = useState<DiagramElement['type'] | 'pen' | 'pan' | null>(null);
@@ -204,13 +203,11 @@ export default function CanvasPage() {
     }, [history, historyIndex]);
   
   const handleCanvasNameChange = (name: string) => {
-    setCanvasData(prev => prev ? ({...prev, name}) : null);
-    setIsDirty(true);
+    updateCanvasData(() => ({ name }));
     setIsEditingName(false);
   };
   const handleNotesChange = (newNotes: string) => {
-    setCanvasData(prev => prev ? ({...prev, notes: newNotes}) : null);
-    setIsDirty(true);
+    updateCanvasData(() => ({ notes: newNotes }));
   };
   
   useEffect(() => {
@@ -272,7 +269,7 @@ export default function CanvasPage() {
   }, [user, router, toast]);
 
   const handleDeleteSelected = useCallback(() => {
-    if (selectedElementIds.length === 0 || !canvasData) return;
+    if (selectedElementIds.length === 0) return;
     updateCanvasData(prev => ({
         elements: prev.elements.filter(el => !selectedElementIds.includes(el.id)),
         connections: prev.connections.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)),
@@ -280,7 +277,7 @@ export default function CanvasPage() {
 
     setSelectedElementIds([]);
     toast({ title: 'Elements Deleted', duration: 2000 });
-  }, [selectedElementIds, canvasData, toast, updateCanvasData]);
+  }, [selectedElementIds, toast, updateCanvasData]);
 
   const handleDeleteCanvas = useCallback(async () => {
     if (!canvasId || !user) return;
@@ -382,17 +379,17 @@ export default function CanvasPage() {
   }, [notes, toast, updateCanvasData]);
 
   const handleSuggestConnections = useCallback(async () => {
-    if (!canvasData) return;
+    if (!elements) return;
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
     try {
-      const elementIdentifiers = canvasData.elements.map(el => `element-id-${el.id}`).filter(Boolean) as string[]; 
-      const result = await suggestConnectionsAction({ notes: canvasData.notes, diagramElements: elementIdentifiers });
+      const elementIdentifiers = elements.map(el => `element-id-${el.id}`).filter(Boolean) as string[]; 
+      const result = await suggestConnectionsAction({ notes, diagramElements: elementIdentifiers });
       
       if (result.connections.length > 0) {
         const newConnections: DiagramConnection[] = [];
         result.connections.forEach(conn => {
-          const sourceEl = canvasData.elements.find(el => `element-id-${el.id}` === conn.source);
-          const targetEl = canvasData.elements.find(el => `element-id-${el.id}` === conn.target);
+          const sourceEl = elements.find(el => `element-id-${el.id}` === conn.source);
+          const targetEl = elements.find(el => `element-id-${el.id}` === conn.target);
           if (sourceEl && targetEl) {
             newConnections.push({
               id: `conn-${Date.now()}-${Math.random()}`,
@@ -409,7 +406,7 @@ export default function CanvasPage() {
     } catch (error) {
       toast({ variant: "destructive", title: 'Error', description: 'An error occurred while suggesting connections.' });
     }
-  }, [notes, canvasData, toast, updateCanvasData, connections]);
+  }, [notes, elements, toast, updateCanvasData]);
 
   const handleExportMarkdown = useCallback(() => {
     const blob = new Blob([notes], { type: 'text/markdown' });
@@ -509,8 +506,8 @@ a.href = url;
         const selectedElement = elements.find(el => el.id === elementId);
         if (!selectedElement) return;
 
-        const isResizing = handle && !['top', 'right', 'bottom', 'left'].includes(handle);
-        const isCreating = handle && ['top', 'right', 'bottom', 'left'].includes(handle) && !e.altKey;
+        const isResizing = !!handle && !['top', 'right', 'bottom', 'left'].includes(handle);
+        const isCreating = !!handle && ['top', 'right', 'bottom', 'left'].includes(handle) && !e.altKey;
 
         if (isCreating) {
             setAction('creating');
@@ -574,17 +571,16 @@ a.href = url;
         newX = Math.max(0, Math.min(newX, containerRect.width - toolbarWidth));
         newY = Math.max(0, Math.min(newY, containerRect.height - toolbarHeight));
 
-        setCanvasData(prev => prev ? ({...prev, toolbarPosition: { x: newX, y: newY }}) : null);
+        updateCanvasData(prev => ({ toolbarPosition: { x: newX, y: newY }}));
     } else if (action === 'panning') {
         if (!initialState.current?.initialTransform) return;
-        setCanvasData(prev => prev ? ({
-          ...prev,
+        updateCanvasData(prev => ({
           transform: {
             ...prev.transform,
             dx: initialState.current!.initialTransform!.dx + dx,
             dy: initialState.current!.initialTransform!.dy + dy,
           }
-        }) : null);
+        }));
     } else if (action === 'marquee' && marqueeRect) {
         if (!initialState.current) return;
         const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
@@ -846,7 +842,7 @@ a.href = url;
             const newDx = mouseX - (mouseX - prevTransform.dx) * (newScale / prevTransform.scale);
             const newDy = mouseY - (mouseY - prevTransform.dy) * (newScale / prevTransform.scale);
         
-            return { ...prev, transform: { scale: newScale, dx: newDx, dy: newDy } };
+            return { ...prev, transform: { ...prev.transform, scale: newScale, dx: newDx, dy: newDy } };
         });
     } else { // Pan with mouse wheel or two-finger swipe on trackpads
         const { deltaX, deltaY } = e;
@@ -864,13 +860,7 @@ a.href = url;
         });
     }
   };
-
-  const getCursor = () => {
-    if (activeTool === 'pan' || action === 'panning') return 'grabbing';
-    if (activeTool) return 'crosshair';
-    return 'default';
-  }
-
+  
   const paddingTop = '57px';
   
   if (loading || !isMounted || !canvasData) {
@@ -902,7 +892,8 @@ a.href = url;
           onToolbarMouseDown={handleToolbarMouseDown}
           transform={transform}
           onWheel={handleWheel}
-          getCursor={getCursor}
+          cursor={cursor}
+          setCursor={setCursor}
       />
        {action === 'editing' && editingElementId && (
           (() => {

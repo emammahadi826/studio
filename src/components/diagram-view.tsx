@@ -111,13 +111,14 @@ function DiagramToolbar({
   );
 }
 
-type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
+export type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 
 function Element({ 
   element,
   onMouseDown,
   onDoubleClick,
+  setCursor,
   isSelected,
   isEditing,
   transform,
@@ -125,6 +126,7 @@ function Element({
   element: DiagramElement;
   onMouseDown: (e: React.MouseEvent<any>, elementId: string, handle?: ResizingHandle | AnchorSide) => void;
   onDoubleClick: (elementId: string) => void;
+  setCursor: (cursor: string) => void;
   isSelected: boolean;
   isEditing: boolean;
   transform: { scale: number };
@@ -132,6 +134,48 @@ function Element({
   const [isHovered, setIsHovered] = React.useState(false);
   
   const bounds = element.type === 'drawing' && 'points' in element ? getBoundsForDrawing(element.points) : element;
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isSelected || isEditing) {
+      setCursor('move');
+      return;
+    };
+    const { clientX, clientY } = e;
+    const { left, top } = (e.currentTarget as SVGGElement).getBoundingClientRect();
+    const mouseX = (clientX - left) / transform.scale;
+    const mouseY = (clientY - top) / transform.scale;
+    
+    const hoverBuffer = 5 / transform.scale;
+    const onTop = mouseY >= -hoverBuffer && mouseY <= hoverBuffer;
+    const onBottom = mouseY >= bounds.height - hoverBuffer && mouseY <= bounds.height + hoverBuffer;
+    const onLeft = mouseX >= -hoverBuffer && mouseX <= hoverBuffer;
+    const onRight = mouseX >= bounds.width - hoverBuffer && mouseX <= bounds.width + hoverBuffer;
+
+    if (onTop && onLeft) setCursor('nwse-resize');
+    else if (onTop && onRight) setCursor('nesw-resize');
+    else if (onBottom && onLeft) setCursor('nesw-resize');
+    else if (onBottom && onRight) setCursor('nwse-resize');
+    else if (onTop) setCursor('ns-resize');
+    else if (onBottom) setCursor('ns-resize');
+    else if (onLeft) setCursor('ew-resize');
+    else if (onRight) setCursor('ew-resize');
+    else setCursor('move');
+  };
+
+  const getResizeHandleFromCursor = (cursor: string): ResizingHandle | undefined => {
+    const mapping: { [key: string]: ResizingHandle } = {
+      'ns-resize': cursor.includes('top') ? 'top' : 'bottom',
+      'ew-resize': cursor.includes('left') ? 'left' : 'right',
+      'nwse-resize': 'top-left',
+      'nesw-resize': 'top-right',
+    };
+    // This is a simplification; need more context for accurate handle derivation
+    if (cursor === 'ns-resize') return 'bottom';
+    if (cursor === 'ew-resize') return 'right';
+    if (cursor === 'nwse-resize') return 'bottom-right';
+    if (cursor === 'nesw-resize') return 'bottom-left';
+    return undefined;
+  }
 
   const commonProps = {
     x: bounds.x,
@@ -144,31 +188,35 @@ function Element({
     fill: element.type === 'sticky-note' ? (element.backgroundColor || '#FFF9C4') : 'transparent',
     stroke: isSelected ? 'hsl(var(--primary))' : (element.type === 'sticky-note' ? '#E0C000' : 'hsl(var(--foreground))'),
     strokeWidth: isSelected ? 2 / transform.scale : (element.type === 'sticky-note' ? 1 / transform.scale : 2 / transform.scale),
-    cursor: 'move',
   };
 
   
-  const handleSize = 8 / transform.scale;
-  const handles: { position: ResizingHandle; cursor: string; x: number; y: number }[] = [
-    { position: 'top-left', cursor: 'nwse-resize', x: bounds.x - handleSize/2, y: bounds.y - handleSize/2 },
-    { position: 'top-right', cursor: 'nesw-resize', x: bounds.x + bounds.width - handleSize/2, y: bounds.y - handleSize/2 },
-    { position: 'bottom-left', cursor: 'nesw-resize', x: bounds.x - handleSize/2, y: bounds.y + bounds.height - handleSize/2 },
-    { position: 'bottom-right', cursor: 'nwse-resize', x: bounds.x + bounds.width - handleSize/2, y: bounds.y + bounds.height - handleSize/2 },
-    { position: 'top', cursor: 'ns-resize', x: bounds.x + bounds.width / 2 - handleSize / 2, y: bounds.y - handleSize/2 },
-    { position: 'bottom', cursor: 'ns-resize', x: bounds.x + bounds.width / 2 - handleSize / 2, y: bounds.y + bounds.height - handleSize/2 },
-    { position: 'left', cursor: 'ew-resize', x: bounds.x - handleSize/2, y: bounds.y + bounds.height / 2 - handleSize / 2 },
-    { position: 'right', cursor: 'ew-resize', x: bounds.x + bounds.width - handleSize/2, y: bounds.y + bounds.height / 2 - handleSize / 2 },
-  ];
+  const handleMouseDown = (e: React.MouseEvent<any>) => {
+    let handle: ResizingHandle | undefined = undefined;
+    const cursor = (e.currentTarget as HTMLElement).style.cursor || 'move';
+    if (cursor.endsWith('-resize')) {
+      const { clientX, clientY } = e;
+      const { left, top } = (e.currentTarget as SVGGElement).getBoundingClientRect();
+      const mouseX = (clientX - left) / transform.scale;
+      const mouseY = (clientY - top) / transform.scale;
+      const hoverBuffer = 5 / transform.scale;
 
-  const anchorSize = 10;
-  const anchors: { side: AnchorSide, x: number, y: number }[] = [
-      { side: 'top', x: bounds.x + bounds.width / 2 - anchorSize/2, y: bounds.y - anchorSize/2 },
-      { side: 'right', x: bounds.x + bounds.width - anchorSize/2, y: bounds.y + bounds.height/2 - anchorSize/2 },
-      { side: 'bottom', x: bounds.x + bounds.width / 2 - anchorSize/2, y: bounds.y + bounds.height - anchorSize/2 },
-      { side: 'left', x: bounds.x - anchorSize/2, y: bounds.y + bounds.height/2 - anchorSize/2 },
-  ];
-  
-  const handleMouseDown = (e: React.MouseEvent<any>) => onMouseDown(e, element.id)
+      const onTop = mouseY >= -hoverBuffer && mouseY <= hoverBuffer;
+      const onBottom = mouseY >= bounds.height - hoverBuffer && mouseY <= bounds.height + hoverBuffer;
+      const onLeft = mouseX >= -hoverBuffer && mouseX <= hoverBuffer;
+      const onRight = mouseX >= bounds.width - hoverBuffer && mouseX <= bounds.width + hoverBuffer;
+      
+      if (onTop && onLeft) handle = 'top-left';
+      else if (onTop && onRight) handle = 'top-right';
+      else if (onBottom && onLeft) handle = 'bottom-left';
+      else if (onBottom && onRight) handle = 'bottom-right';
+      else if (onTop) handle = 'top';
+      else if (onBottom) handle = 'bottom';
+      else if (onLeft) handle = 'left';
+      else if (onRight) handle = 'right';
+    }
+    onMouseDown(e, element.id, handle);
+  };
   const handleDoubleClick = () => onDoubleClick(element.id)
 
   const renderElement = () => {
@@ -190,14 +238,14 @@ function Element({
     switch (element.type) {
       case 'rectangle':
         return (
-          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+          <g>
             <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale}  />
             {textElement}
           </g>
         );
       case 'circle':
         return (
-          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+          <g>
             <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps}  />
             {textElement}
           </g>
@@ -206,7 +254,7 @@ function Element({
         const { x, y, width, height } = bounds;
         const points = `${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}`;
         return (
-          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+          <g>
             <polygon points={points} {...styleProps} />
             {textElement}
           </g>
@@ -216,7 +264,7 @@ function Element({
         const { x, y, width, height } = bounds;
         const points = `${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`;
         return (
-          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+          <g>
             <polygon points={points} {...styleProps} />
             {textElement}
           </g>
@@ -226,7 +274,7 @@ function Element({
         const { x, y, width, height } = bounds;
         const ellipseHeight = Math.min(height * 0.3, 20);
         return (
-           <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} cursor="move">
+           <g>
               <path 
                 d={`M${x},${y + ellipseHeight / 2} 
                    C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
@@ -248,14 +296,14 @@ function Element({
       }
       case 'sticky-note':
         return (
-          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+          <g>
             <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))' }} />
             {textElement}
           </g>
         );
       case 'text':
         return (
-            <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+            <g>
                 <rect {...commonProps} fill="transparent" stroke="none" />
                 {textElement}
             </g>
@@ -264,7 +312,7 @@ function Element({
         if (!element.points || element.points.length === 0) return null;
         const pathData = getSvgPathFromStroke(element.points);
         return (
-          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} cursor="move">
+          <g cursor="move">
             {/* Wider, transparent path for easier selection */}
             <path
               d={pathData}
@@ -293,40 +341,31 @@ function Element({
   }
 
   return (
-    <g onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+    <g 
+      onMouseEnter={() => setIsHovered(true)} 
+      onMouseLeave={() => { setIsHovered(false); setCursor('default'); }}
+      onMouseMove={handleMouseMove}
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
+      style={{ cursor: isSelected ? 'move' : 'pointer' }}
+    >
       {renderElement()}
       {isSelected && !isEditing && (
-        <>
-            {element.type !== 'drawing' ? handles.map(handle => (
-                <rect
-                    key={handle.position}
-                    x={handle.x}
-                    y={handle.y}
-                    width={handleSize}
-                    height={handleSize}
-                    fill="hsla(var(--background), 0.5)"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={1 / transform.scale}
-                    cursor={handle.cursor}
-                    onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
-                />
-            )) : (
-                 <rect
-                    x={bounds.x}
-                    y={bounds.y}
-                    width={bounds.width}
-                    height={bounds.height}
-                    fill="none"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={1.5 / transform.scale}
-                    strokeDasharray={`${4 / transform.scale}`}
-                    rx={4 / transform.scale} ry={4 / transform.scale}
-                    style={{ pointerEvents: 'none' }}
-                />
-            )}
-        </>
+        <rect
+          x={bounds.x}
+          y={bounds.y}
+          width={bounds.width}
+          height={bounds.height}
+          fill="transparent"
+          stroke="hsl(var(--primary))"
+          strokeWidth={1 / transform.scale}
+          strokeDasharray={`${4 / transform.scale}`}
+          rx={element.type === 'rectangle' ? 8 / transform.scale : 0}
+          ry={element.type === 'rectangle' ? 8 / transform.scale : 0}
+          style={{ pointerEvents: 'none' }}
+        />
       )}
-       {isHovered && !isSelected && !isEditing && element.type !== 'drawing' && (
+       {isHovered && !isSelected && !isEditing && (
         <rect
           x={bounds.x}
           y={bounds.y}
@@ -347,7 +386,7 @@ function GhostElement({ element, transform }: { element: DiagramElement | null, 
     if (!element || element.type === 'drawing') return null;
 
     const commonProps = {
-        fill: "hsla(var(--primary), 0.2)",
+        fill: "hsla(var(--primary-raw), 0.2)",
         stroke: "hsl(var(--primary))",
         strokeWidth: 2 / transform.scale,
         strokeDasharray: `${5 / transform.scale} ${5 / transform.scale}`,
@@ -464,7 +503,8 @@ interface DiagramViewProps {
   onToolbarMouseDown: (e: React.MouseEvent) => void;
   transform: { scale: number, dx: number, dy: number };
   onWheel: (e: React.WheelEvent) => void;
-  getCursor: () => string;
+  cursor: string;
+  setCursor: (cursor: string) => void;
 }
 
 export function DiagramView({ 
@@ -485,7 +525,8 @@ export function DiagramView({
     onToolbarMouseDown,
     transform,
     onWheel,
-    getCursor,
+    cursor,
+    setCursor,
 }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
@@ -501,7 +542,6 @@ export function DiagramView({
         height="100%" 
         className="bg-background"
         onMouseDown={(e) => {
-            // Check if the event target is the SVG itself, not a child element
             if (e.target === e.currentTarget) {
                 onCanvasMouseDown(e, null);
             }
@@ -511,7 +551,7 @@ export function DiagramView({
         onMouseLeave={onCanvasMouseUp}
         onClick={onCanvasClick}
         onWheel={onWheel}
-        style={{ cursor: getCursor() }}
+        style={{ cursor }}
         >
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto" markerUnits="strokeWidth">
@@ -528,6 +568,7 @@ export function DiagramView({
                     element={el}
                     onMouseDown={onCanvasMouseDown}
                     onDoubleClick={onElementDoubleClick}
+                    setCursor={setCursor}
                     isSelected={selectedElementIds.includes(el.id)}
                     isEditing={editingElementId === el.id}
                     transform={transform}
