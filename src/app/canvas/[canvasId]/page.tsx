@@ -203,6 +203,7 @@ export default function CanvasPage() {
     }, [history, historyIndex]);
   
   const handleCanvasNameChange = (name: string) => {
+    setEditingNameValue(name);
     updateCanvasData(() => ({ name }));
     setIsEditingName(false);
   };
@@ -379,7 +380,7 @@ export default function CanvasPage() {
   }, [notes, toast, updateCanvasData]);
 
   const handleSuggestConnections = useCallback(async () => {
-    if (!elements) return;
+    if (!elements || elements.length === 0) return;
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
     try {
       const elementIdentifiers = elements.map(el => `element-id-${el.id}`).filter(Boolean) as string[]; 
@@ -398,7 +399,7 @@ export default function CanvasPage() {
             });
           }
         });
-        updateCanvasData(prev => ({ connections: [...prev.connections, ...newConnections] }), true);
+        updateCanvasData(prev => ({ connections: [...(prev.connections || []), ...newConnections] }), true);
         toast({ title: 'Connections Suggested!', description: 'AI has added connections between elements.' });
       } else {
         toast({ variant: "destructive", title: 'No Connections Found', description: 'The AI could not find any clear connections to suggest.' });
@@ -407,6 +408,7 @@ export default function CanvasPage() {
       toast({ variant: "destructive", title: 'Error', description: 'An error occurred while suggesting connections.' });
     }
   }, [notes, elements, toast, updateCanvasData]);
+
 
   const handleExportMarkdown = useCallback(() => {
     const blob = new Blob([notes], { type: 'text/markdown' });
@@ -529,6 +531,7 @@ a.href = url;
                 currentSelectedIds = [elementId];
             }
             setSelectedElementIds(currentSelectedIds);
+            // capture initial state here
             initialState.current.elements = JSON.parse(JSON.stringify(elements));
         }
 
@@ -563,7 +566,7 @@ a.href = url;
         
         const containerRect = canvasContainerRef.current.getBoundingClientRect();
         const toolbarWidth = 52; 
-        const toolbarHeight = 316; 
+        const toolbarHeight = 484; 
 
         let newX = initialState.current.toolbarX + dx;
         let newY = initialState.current.toolbarY + dy;
@@ -621,6 +624,10 @@ a.href = url;
       setGhostElement(newElement);
 
     } else if (action === 'dragging' && selectedElementIds.length > 0 && initialState.current?.elements) {
+        // Guard clause: Ensure that initialState.current.elements is not undefined
+        if (!initialState.current.elements) {
+          return;
+        }
         updateCanvasData(prev => ({
             elements: initialState.current!.elements!.map(el => {
                 if (selectedElementIds.includes(el.id)) {
@@ -713,43 +720,46 @@ a.href = url;
         }
     }
     else if (action === 'creatingShape' && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
-      let finalElement: DiagramElement | null = null;
-      if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
-          const canvasCoords = screenToCanvas(e.clientX, e.clientY);
-          const defaultWidth = 150;
-          const defaultHeight = activeTool === 'sticky-note' ? 150 : (activeTool === 'text' ? 40 : 80);
+      const createNewElement = () => {
+        let finalElement: DiagramElement | null = null;
+        if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
+            const canvasCoords = screenToCanvas(e.clientX, e.clientY);
+            const defaultWidth = 150;
+            const defaultHeight = activeTool === 'sticky-note' ? 150 : (activeTool === 'text' ? 40 : 80);
+            finalElement = {
+                id: `el-${Date.now()}`,
+                type: activeTool,
+                width: defaultWidth,
+                height: defaultHeight,
+                x: canvasCoords.x - defaultWidth / 2, 
+                y: canvasCoords.y - defaultHeight / 2,
+                backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
+                content: '',
+            };
+        } 
+        else if (ghostElement) {
           finalElement = {
-              id: `el-${Date.now()}`,
-              type: activeTool,
-              width: defaultWidth,
-              height: defaultHeight,
-              x: canvasCoords.x - defaultWidth / 2, 
-              y: canvasCoords.y - defaultHeight / 2,
-              backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
-              content: '',
+            ...ghostElement,
+            id: `el-${Date.now()}`,
+            backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
+            content: '',
           };
-      } 
-      else if (ghostElement) {
-        finalElement = {
-          ...ghostElement,
-          id: `el-${Date.now()}`,
-          backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
-          content: '',
-        };
+        }
+        
+        if (finalElement) {
+            const newElement = finalElement; // for type safety
+            updateCanvasData(prev => ({
+                elements: [...prev.elements, newElement]
+            }), true);
+            setSelectedElementIds([newElement.id]);
+            setEditingElementId(newElement.id);
+            setAction('editing');
+        } else {
+            setAction('none');
+        }
+        setActiveTool(null);
       }
-      
-      if (finalElement) {
-          const newElement = finalElement; // for type safety
-          updateCanvasData(prev => ({
-              elements: [...prev.elements, newElement]
-          }), true);
-          setSelectedElementIds([newElement.id]);
-          setEditingElementId(newElement.id);
-          setAction('editing');
-      } else {
-          setAction('none');
-      }
-      setActiveTool(null);
+      createNewElement();
     }
     else if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
         const sourceElementId = initialState.current.sourceElementId;
@@ -764,7 +774,7 @@ a.href = url;
         
         updateCanvasData(prev => ({
             elements: [...prev.elements, finalGhost as DiagramElement],
-            connections: [...prev.connections, newConnection]
+            connections: [...(prev.connections || []), newConnection]
         }), true);
         setAction('none');
     } else {
@@ -990,11 +1000,5 @@ a.href = url;
     </main>
   );
 }
-
-    
-
-    
-
-
 
     
