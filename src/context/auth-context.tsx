@@ -38,7 +38,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (loading) return;
 
-    const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route) && (pathname.length > route.length ? pathname.charAt(route.length) === '/' : true));
+    const isProtectedRoute = PROTECTED_ROUTES.some(route => 
+        route === '/' ? pathname === '/' : pathname.startsWith(route)
+    );
 
     if (!user && isProtectedRoute) {
       router.push('/login');
@@ -47,8 +49,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
+  const isProtectedRoutePage = PROTECTED_ROUTES.some(route => 
+    route === '/' ? pathname === '/' : pathname.startsWith(route)
+  );
 
-  if (loading) {
+  if (loading || (!user && isProtectedRoutePage)) {
       return (
         <div className="flex items-center justify-center h-screen">
           <div className="flex flex-col items-center gap-4">
