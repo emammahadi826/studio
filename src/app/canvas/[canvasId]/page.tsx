@@ -130,7 +130,8 @@ export default function CanvasPage() {
     });
 
     return () => unsubscribe();
-  }, [canvasId, user, router, toast, isEditingName, historyIndex]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasId, user, router, toast]);
 
   
   const saveCanvas = useCallback(async () => {
@@ -171,43 +172,68 @@ export default function CanvasPage() {
   }, [saveCanvas]);
 
 
-  const updateCanvasData = useCallback((updater: (prev: CanvasData) => Partial<CanvasData>, addToHistory = false) => {
-    setCanvasData(prev => {
-        if (!prev) return null;
-        const updates = updater(prev);
-        const newState = { ...prev, ...updates };
+  const updateCanvasData = useCallback((updates: Partial<CanvasData>, addToHistory = false) => {
+      setCanvasData(prev => {
+          if (!prev) return null;
+          const newState = { ...prev, ...updates };
 
-        if (addToHistory && (updates.elements || updates.connections)) {
-            const newEntry: HistoryEntry = {
-                elements: updates.elements || prev.elements,
-                connections: updates.connections || prev.connections,
-            };
+          if (addToHistory && (updates.elements || updates.connections)) {
+              const newEntry: HistoryEntry = {
+                  elements: updates.elements !== undefined ? updates.elements : prev.elements,
+                  connections: updates.connections !== undefined ? updates.connections : prev.connections,
+              };
+              const newHistory = history.slice(0, historyIndex + 1);
+              newHistory.push(newEntry);
+              setHistory(newHistory);
+              setHistoryIndex(newHistory.length - 1);
+          }
+          
+          setIsDirty(true);
+          return newState;
+      });
+    }, [history, historyIndex]);
+  
+  const handleCanvasNameChange = (name: string) => {
+    updateCanvasData({ name });
+    setIsEditingName(false);
+  };
+  const handleNotesChange = (notes: string) => updateCanvasData({ notes });
+  
+  const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[], addToHistory = false) => {
+      setCanvasData(prev => {
+        if (!prev) return null;
+        const newElements = updater(prev.elements);
+        if (addToHistory) {
+            const newEntry: HistoryEntry = { elements: newElements, connections: prev.connections };
             const newHistory = history.slice(0, historyIndex + 1);
             newHistory.push(newEntry);
             setHistory(newHistory);
             setHistoryIndex(newHistory.length - 1);
         }
-        
         setIsDirty(true);
-        return newState;
-    });
+        return { ...prev, elements: newElements };
+      });
   }, [history, historyIndex]);
-  
-  const handleCanvasNameChange = (name: string) => {
-    updateCanvasData(() => ({ name }));
-    setIsEditingName(false);
-  };
-  const handleNotesChange = (notes: string) => updateCanvasData(() => ({ notes }));
-  
-  const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[], addToHistory = false) => {
-      updateCanvasData(prev => ({ elements: updater(prev.elements) }), addToHistory);
-  }, [updateCanvasData]);
+
   const handleConnectionsChange = useCallback((updater: (prev: DiagramConnection[]) => DiagramConnection[], addToHistory = false) => {
-      updateCanvasData(prev => ({ connections: updater(prev.connections) }), addToHistory);
-  }, [updateCanvasData]);
-  const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData(() => ({ toolbarPosition: position }));
+      setCanvasData(prev => {
+        if (!prev) return null;
+        const newConnections = updater(prev.connections);
+         if (addToHistory) {
+            const newEntry: HistoryEntry = { elements: prev.elements, connections: newConnections };
+            const newHistory = history.slice(0, historyIndex + 1);
+            newHistory.push(newEntry);
+            setHistory(newHistory);
+            setHistoryIndex(newHistory.length - 1);
+        }
+        setIsDirty(true);
+        return { ...prev, connections: newConnections };
+      });
+  }, [history, historyIndex]);
+
+  const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData({ toolbarPosition: position });
   const handleTransformChange = (updater: (prev: { scale: number, dx: number, dy: number }) => { scale: number, dx: number, dy: number }) => {
-      updateCanvasData(prev => ({ transform: updater(prev.transform) }));
+      setCanvasData(prev => prev ? ({ ...prev, transform: updater(prev.transform) }) : null);
   };
 
 
@@ -271,12 +297,14 @@ export default function CanvasPage() {
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
+    updateCanvasData({
+        elements: elements.filter(el => !selectedElementIds.includes(el.id)),
+        connections: connections.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)),
+    }, true);
 
-    handleElementsChange(prev => prev.filter(el => !selectedElementIds.includes(el.id)), true);
-    handleConnectionsChange(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)), false);
     setSelectedElementIds([]);
     toast({ title: 'Elements Deleted', duration: 2000 });
-  }, [selectedElementIds, toast, handleElementsChange, handleConnectionsChange]);
+  }, [selectedElementIds, elements, connections, toast, updateCanvasData]);
 
   const handleDeleteCanvas = useCallback(async () => {
     if (!canvasId || !user) return;
@@ -290,13 +318,20 @@ export default function CanvasPage() {
     }
   }, [canvasId, user, toast, router]);
 
-  const cancelEditing = useCallback(() => {
+  const cancelEditing = useCallback((finalContent?: string) => {
     if (editingElementId) {
-      handleElementsChange(prev => prev, true); // This will add the final edit to history
+        updateCanvasData({
+            elements: elements.map(el => {
+                if (el.id === editingElementId && 'content' in el) {
+                    return { ...el, content: finalContent ?? el.content };
+                }
+                return el;
+            })
+        }, true);
     }
     setEditingElementId(null);
     setAction('none');
-  }, [editingElementId, handleElementsChange]);
+  }, [editingElementId, elements, updateCanvasData]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -315,12 +350,17 @@ export default function CanvasPage() {
         if (e.key === 'Escape') {
           if (action === 'editing') {
             cancelEditing();
+          } else {
+             setAction('none');
+             setActiveTool(null);
+             setGhostElement(null);
+             setMarqueeRect(null);
+             setSelectedElementIds([]);
           }
-          setActiveTool(null);
         }
         if (e.key === 'Enter' && action === 'editing' && !e.shiftKey) {
             e.preventDefault();
-            cancelEditing();
+            cancelEditing((e.target as HTMLTextAreaElement).value);
         }
     };
 
@@ -347,6 +387,7 @@ export default function CanvasPage() {
 
   const handleToolSelect = (type: DiagramElement['type'] | 'pen' | 'pan' | null) => {
     setActiveTool(type);
+    setSelectedElementIds([]);
   };
   
   const handleGenerateDiagram = useCallback(async () => {
@@ -354,7 +395,7 @@ export default function CanvasPage() {
     try {
       const result = await generateDiagramAction({ notes });
       if (result.elements.length > 0) {
-        handleElementsChange(() => result.elements, true);
+        updateCanvasData({ elements: result.elements }, true);
         toast({ title: 'Diagram Generated!', description: 'The AI has created a diagram from your notes.' });
       } else {
         toast({ variant: "destructive", title: 'Generation Failed', description: 'Could not generate a diagram. Try rephrasing your notes.' });
@@ -362,7 +403,7 @@ export default function CanvasPage() {
     } catch (error) {
       toast({ variant: "destructive", title: 'Error', description: 'An error occurred while generating the diagram.' });
     }
-  }, [notes, toast, handleElementsChange]);
+  }, [notes, toast, updateCanvasData]);
 
   const handleSuggestConnections = useCallback(async () => {
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
@@ -383,7 +424,7 @@ export default function CanvasPage() {
             });
           }
         });
-        handleConnectionsChange(prev => [...prev, ...newConnections], true);
+        updateCanvasData({ connections: [...connections, ...newConnections] }, true);
         toast({ title: 'Connections Suggested!', description: 'AI has added connections between elements.' });
       } else {
         toast({ variant: "destructive", title: 'No Connections Found', description: 'The AI could not find any clear connections to suggest.' });
@@ -391,7 +432,7 @@ export default function CanvasPage() {
     } catch (error) {
       toast({ variant: "destructive", title: 'Error', description: 'An error occurred while suggesting connections.' });
     }
-  }, [notes, elements, toast, handleConnectionsChange]);
+  }, [notes, elements, toast, updateCanvasData, connections]);
 
   const handleExportMarkdown = useCallback(() => {
     const blob = new Blob([notes], { type: 'text/markdown' });
@@ -469,6 +510,7 @@ export default function CanvasPage() {
         type: 'drawing',
         points: newPath.points,
         x: 0, y: 0, width: 0, height: 0, // These will be calculated later
+        content: '',
       };
       handleElementsChange(prev => [...prev, newDrawingElement]);
       return;
@@ -481,6 +523,7 @@ export default function CanvasPage() {
         y: canvasCoords.y,
         width: 0,
         height: 0,
+        content: '',
       });
       return;
     }
@@ -688,6 +731,13 @@ export default function CanvasPage() {
         }
     }
     else if (action === 'creatingShape' && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
+      const createNewElement = (el: DiagramElement) => {
+          handleElementsChange(prev => [...prev, el], true);
+          setSelectedElementIds([el.id]);
+          setEditingElementId(el.id);
+          setAction('editing');
+      }
+
       if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
           const canvasCoords = screenToCanvas(e.clientX, e.clientY);
           const defaultWidth = 150;
@@ -700,22 +750,18 @@ export default function CanvasPage() {
               x: canvasCoords.x - defaultWidth / 2, 
               y: canvasCoords.y - defaultHeight / 2,
               backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
+              content: '',
           };
-          handleElementsChange(prev => [...prev, newElement], true);
-          setSelectedElementIds([newElement.id]);
-          setEditingElementId(newElement.id);
-          setAction('editing');
+          createNewElement(newElement);
       } 
       else if (ghostElement) {
         const newElement: DiagramElement = {
           ...ghostElement,
           id: `el-${Date.now()}`,
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
+          content: '',
         };
-        handleElementsChange(prev => [...prev, newElement], true);
-        setSelectedElementIds([newElement.id]);
-        setEditingElementId(newElement.id);
-        setAction('editing');
+        createNewElement(newElement);
       } else {
         setAction('none');
       }
@@ -724,16 +770,18 @@ export default function CanvasPage() {
     else if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
         const sourceElementId = initialState.current.sourceElementId;
         const newElementId = `el-${Date.now()}`;
-        const finalGhost = { ...ghostElement, id: newElementId };
+        const finalGhost = { ...ghostElement, id: newElementId, content: '' };
         
         const newConnection: DiagramConnection = {
             id: `conn-${Date.now()}`,
             source: { elementId: sourceElementId },
             target: { elementId: newElementId },
         };
-
-        handleElementsChange(prev => [...prev, finalGhost as DiagramElement], true);
-        handleConnectionsChange(prev => [...prev, newConnection], false);
+        
+        updateCanvasData({
+            elements: [...elements, finalGhost as DiagramElement],
+            connections: [...connections, newConnection]
+        }, true);
         setAction('none');
     } else {
         if (isHistoryEvent && action !== 'drawing') { // drawing handles its own history
@@ -762,14 +810,31 @@ export default function CanvasPage() {
   };
   
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (action === 'editing' && e.target instanceof SVGElement && e.target.id === 'diagram-canvas') {
-        cancelEditing();
+    const target = e.target as HTMLElement;
+    if (action === 'editing' && target.id === 'diagram-canvas') {
+        const textareaValue = textareaRef.current?.value;
+        cancelEditing(textareaValue);
     }
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    // handleElementsChange(prev => prev.map(el => 'content' in el && el.id === editingElementId ? { ...el, content: newContent } : el));
+    if (!editingElementId) return;
+
+    // This updates the visual state but doesn't save to history yet.
+    // The final save happens on blur (cancelEditing).
+    setCanvasData(prev => {
+        if (!prev) return null;
+        return {
+            ...prev,
+            elements: prev.elements.map(el => {
+                if (el.id === editingElementId && 'content' in el) {
+                    return { ...el, content: newContent };
+                }
+                return el;
+            })
+        }
+    });
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -850,7 +915,7 @@ export default function CanvasPage() {
        {action === 'editing' && editingElementId && (
           (() => {
               const el = elements.find(e => e.id === editingElementId) as Extract<DiagramElement, { x: number }>;
-              if (!el) return null;
+              if (!el || !('content' in el)) return null;
               
               const left = transform.dx + el.x * transform.scale;
               const top = transform.dy + el.y * transform.scale;
@@ -860,16 +925,16 @@ export default function CanvasPage() {
               return (
                   <textarea
                       ref={textareaRef}
-                      defaultValue={''}
+                      value={el.content}
                       onChange={handleTextareaChange}
-                      onBlur={cancelEditing}
+                      onBlur={(e) => cancelEditing(e.target.value)}
                       onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
-                              cancelEditing();
+                              cancelEditing(e.target.value);
                           }
                           if (e.key === 'Escape') {
-                              cancelEditing();
+                              cancelEditing(el.content);
                           }
                       }}
                       style={{
@@ -943,5 +1008,3 @@ export default function CanvasPage() {
     </main>
   );
 }
-
-    

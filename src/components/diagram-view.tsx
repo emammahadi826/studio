@@ -10,17 +10,15 @@ import { cn } from '@/lib/utils';
 import { Separator } from './ui/separator';
 
 function getSvgPathFromStroke(stroke: {x:number, y:number}[]) {
-  if (!stroke || stroke.length === 0) return "";
-  const d = stroke.reduce(
-    (acc, { x, y }, i, a) => {
-      if (i === 0) return `M ${x},${y}`;
-      const [lastX, lastY] = [a[i-1].x, a[i-1].y];
-      return `${acc} L ${lastX},${lastY}`;
-    },
-    ""
-  );
-  return d;
+  if (!stroke || stroke.length < 2) return "";
+
+  let path = `M ${stroke[0].x} ${stroke[0].y}`;
+  for (let i = 1; i < stroke.length; i++) {
+    path += ` L ${stroke[i].x} ${stroke[i].y}`;
+  }
+  return path;
 }
+
 
 function getBoundsForDrawing(points: {x: number, y: number}[]) {
     if (!points || points.length === 0) {
@@ -174,17 +172,34 @@ function Element({
   const handleDoubleClick = () => onDoubleClick(element.id)
 
   const renderElement = () => {
+    const textContent = 'content' in element && !isEditing ? element.content : '';
+    
+    const textElement = textContent && (
+      <text
+        x={bounds.x + bounds.width / 2}
+        y={bounds.y + bounds.height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="hsl(var(--foreground))"
+        style={{ fontSize: 14 / transform.scale, pointerEvents: 'none' }}
+      >
+        {textContent}
+      </text>
+    );
+
     switch (element.type) {
       case 'rectangle':
         return (
           <>
             <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            {textElement}
           </>
         );
       case 'circle':
         return (
           <>
             <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            {textElement}
           </>
         );
       case 'diamond':
@@ -193,6 +208,7 @@ function Element({
         return (
           <>
             <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            {textElement}
           </>
         );
       case 'triangle': {
@@ -201,6 +217,7 @@ function Element({
         return (
           <>
             <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            {textElement}
           </>
         );
       }
@@ -227,6 +244,7 @@ function Element({
                 />
                 <rect {...commonProps} fill="transparent" />
             </g>
+            {textElement}
           </>
         );
       }
@@ -234,11 +252,15 @@ function Element({
         return (
           <>
             <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
+            {textElement}
           </>
         );
       case 'text':
         return (
-            <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}></foreignObject>
+            <>
+                <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}></foreignObject>
+                {textElement}
+            </>
         );
       case 'drawing': {
         if (!element.points || element.points.length === 0) return null;
@@ -277,7 +299,7 @@ function Element({
       {renderElement()}
       {isSelected && !isEditing && (
         <>
-            {element.type !== 'drawing' && handles.map(handle => (
+            {element.type !== 'drawing' ? handles.map(handle => (
                 <rect
                     key={handle.position}
                     x={handle.x}
@@ -290,8 +312,7 @@ function Element({
                     cursor={handle.cursor}
                     onMouseDown={(e) => onMouseDown(e, element.id, handle.position)}
                 />
-            ))}
-            {element.type === 'drawing' && (
+            )) : (
                  <rect
                     x={bounds.x}
                     y={bounds.y}
@@ -505,5 +526,3 @@ export function DiagramView({
     </div>
   );
 }
-
-    

@@ -15,7 +15,7 @@ export type DiagramElement = {
   y: number;
   width: number;
   height: number;
-  
+  content: string;
   backgroundColor?: string;
 } & (
   | { type: 'rectangle' | 'circle' | 'diamond' | 'triangle' | 'cylinder' | 'sticky-note' | 'text' }
