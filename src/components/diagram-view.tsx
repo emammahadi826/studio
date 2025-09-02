@@ -162,7 +162,7 @@ function Element({
           visibility: isEditing ? 'hidden' : 'visible' 
         }}
     >
-        {element.content}
+        
     </div>
   )
 
@@ -177,7 +177,7 @@ function Element({
           visibility: isEditing ? 'hidden' : 'visible' 
         }}
     >
-        {element.content}
+        
     </div>
   )
 

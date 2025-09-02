@@ -467,7 +467,7 @@ export default function CanvasPage() {
         type: 'drawing',
         points: newPath.points,
         x: 0, y: 0, width: 0, height: 0, // These will be calculated later
-        content: '',
+        
       };
       handleElementsChange(prev => [...prev, newDrawingElement]);
       return;
@@ -476,7 +476,7 @@ export default function CanvasPage() {
       setGhostElement({
         id: 'ghost',
         type: activeTool,
-        content: '',
+        
         x: canvasCoords.x,
         y: canvasCoords.y,
         width: 0,
@@ -691,7 +691,7 @@ export default function CanvasPage() {
           const newElement: DiagramElement = {
               ...ghostElement,
               id: `el-${Date.now()}`,
-              content: ``,
+              
               width: defaultWidth,
               height: defaultHeight,
               x: ghostElement.x - defaultWidth / 2, 
@@ -707,7 +707,7 @@ export default function CanvasPage() {
         const newElement: DiagramElement = {
           ...ghostElement,
           id: `el-${Date.now()}`,
-          content: ``,
+          
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
         handleElementsChange(prev => [...prev, newElement], true);
