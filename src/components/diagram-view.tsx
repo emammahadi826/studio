@@ -190,77 +190,75 @@ function Element({
     switch (element.type) {
       case 'rectangle':
         return (
-          <>
-            <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            
-          </>
+          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+            <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale}  />
+            {textElement}
+          </g>
         );
       case 'circle':
         return (
-          <>
-            <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            
-          </>
+          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+            <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps}  />
+            {textElement}
+          </g>
         );
-      case 'diamond':
+      case 'diamond': {
         const { x, y, width, height } = bounds;
         const points = `${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}`;
         return (
-          <>
-            <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            
-          </>
+          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+            <polygon points={points} {...styleProps} />
+            {textElement}
+          </g>
         );
+      }
       case 'triangle': {
         const { x, y, width, height } = bounds;
         const points = `${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`;
         return (
-          <>
-            <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            
-          </>
+          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+            <polygon points={points} {...styleProps} />
+            {textElement}
+          </g>
         );
       }
       case 'cylinder': {
         const { x, y, width, height } = bounds;
         const ellipseHeight = Math.min(height * 0.3, 20);
         return (
-          <>
-             <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} cursor="move">
-                <path 
-                  d={`M${x},${y + ellipseHeight / 2} 
-                     C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
-                     L${x + width},${y + height - ellipseHeight / 2}
-                     C${x + width},${y + height + ellipseHeight / 2} ${x},${y + height + ellipseHeight / 2} ${x},${y + height - ellipseHeight / 2}
-                     Z`}
-                    {...styleProps}
-                />
-                 <ellipse 
-                  cx={x + width / 2} 
-                  cy={y + ellipseHeight / 2} 
-                  rx={width / 2} 
-                  ry={ellipseHeight / 2} 
+           <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} cursor="move">
+              <path 
+                d={`M${x},${y + ellipseHeight / 2} 
+                   C${x},${y - ellipseHeight / 2} ${x + width},${y - ellipseHeight / 2} ${x + width},${y + ellipseHeight / 2}
+                   L${x + width},${y + height - ellipseHeight / 2}
+                   C${x + width},${y + height + ellipseHeight / 2} ${x},${y + height + ellipseHeight / 2} ${x},${y + height - ellipseHeight / 2}
+                   Z`}
                   {...styleProps}
-                />
-                <rect {...commonProps} fill="transparent" />
-            </g>
-            
-          </>
+              />
+               <ellipse 
+                cx={x + width / 2} 
+                cy={y + ellipseHeight / 2} 
+                rx={width / 2} 
+                ry={ellipseHeight / 2} 
+                {...styleProps}
+              />
+              {textElement}
+          </g>
         );
       }
       case 'sticky-note':
         return (
-          <>
-            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            
-          </>
+          <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+            <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))' }} />
+            {textElement}
+          </g>
         );
       case 'text':
         return (
-            <>
-                <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}></foreignObject>
-                
-            </>
+            <g onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
+                <rect {...commonProps} fill="transparent" stroke="none" />
+                {textElement}
+            </g>
         );
       case 'drawing': {
         if (!element.points || element.points.length === 0) return null;
@@ -455,6 +453,9 @@ interface DiagramViewProps {
   marqueeRect: { x: number; y: number; width: number; height: number; } | null;
   onToolSelect: (type: DiagramElement['type'] | 'pen' | 'pan' | null) => void;
   onCanvasMouseDown: (e: React.MouseEvent, elementId: string | null, handle?: ResizingHandle | AnchorSide) => void;
+  onCanvasMouseMove: (e: React.MouseEvent) => void;
+  onCanvasMouseUp: (e: React.MouseEvent) => void;
+  onCanvasClick: (e: React.MouseEvent) => void;
   selectedElementIds: string[];
   activeTool: DiagramElement['type'] | 'pen' | 'pan' | null;
   editingElementId: string | null;
@@ -463,6 +464,7 @@ interface DiagramViewProps {
   onToolbarMouseDown: (e: React.MouseEvent) => void;
   transform: { scale: number, dx: number, dy: number };
   onWheel: (e: React.WheelEvent) => void;
+  getCursor: () => string;
 }
 
 export function DiagramView({ 
@@ -471,7 +473,10 @@ export function DiagramView({
     ghostElement, 
     marqueeRect, 
     onToolSelect, 
-    onCanvasMouseDown, 
+    onCanvasMouseDown,
+    onCanvasMouseMove,
+    onCanvasMouseUp,
+    onCanvasClick, 
     selectedElementIds, 
     activeTool, 
     editingElementId, 
@@ -480,6 +485,7 @@ export function DiagramView({
     onToolbarMouseDown,
     transform,
     onWheel,
+    getCursor,
 }: DiagramViewProps) {
   return (
     <div className="w-full h-full relative" id="diagram-canvas-container">
@@ -500,7 +506,12 @@ export function DiagramView({
                 onCanvasMouseDown(e, null);
             }
         }}
+        onMouseMove={onCanvasMouseMove}
+        onMouseUp={onCanvasMouseUp}
+        onMouseLeave={onCanvasMouseUp}
+        onClick={onCanvasClick}
         onWheel={onWheel}
+        style={{ cursor: getCursor() }}
         >
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="8" refY="3.5" orient="auto" markerUnits="strokeWidth">
