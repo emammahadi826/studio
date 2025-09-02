@@ -142,9 +142,6 @@ export default function CanvasPage() {
     if (dataToSave.elements) {
       dataToSave.elements = dataToSave.elements.map((el: DiagramElement) => {
         const cleanEl = { ...el };
-        if ('content' in cleanEl && cleanEl.content === undefined) {
-            delete (cleanEl as any).content;
-        }
         if (cleanEl.backgroundColor === undefined) {
           delete (cleanEl as any).backgroundColor;
         }
@@ -174,9 +171,10 @@ export default function CanvasPage() {
   }, [saveCanvas]);
 
 
-  const updateCanvasData = useCallback((updates: Partial<CanvasData>, addToHistory = false) => {
+  const updateCanvasData = useCallback((updater: (prev: CanvasData) => Partial<CanvasData>, addToHistory = false) => {
     setCanvasData(prev => {
         if (!prev) return null;
+        const updates = updater(prev);
         const newState = { ...prev, ...updates };
 
         if (addToHistory && (updates.elements || updates.connections)) {
@@ -196,19 +194,20 @@ export default function CanvasPage() {
   }, [history, historyIndex]);
   
   const handleCanvasNameChange = (name: string) => {
-    updateCanvasData({ name });
+    updateCanvasData(() => ({ name }));
     setIsEditingName(false);
   };
-  const handleNotesChange = (notes: string) => updateCanvasData({ notes });
+  const handleNotesChange = (notes: string) => updateCanvasData(() => ({ notes }));
+  
   const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[], addToHistory = false) => {
-      updateCanvasData({ elements: updater(elements) }, addToHistory);
-  }, [elements, updateCanvasData]);
+      updateCanvasData(prev => ({ elements: updater(prev.elements) }), addToHistory);
+  }, [updateCanvasData]);
   const handleConnectionsChange = useCallback((updater: (prev: DiagramConnection[]) => DiagramConnection[], addToHistory = false) => {
-      updateCanvasData({ connections: updater(connections) }, addToHistory);
-  }, [connections, updateCanvasData]);
-  const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData({ toolbarPosition: position });
+      updateCanvasData(prev => ({ connections: updater(prev.connections) }), addToHistory);
+  }, [updateCanvasData]);
+  const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData(() => ({ toolbarPosition: position }));
   const handleTransformChange = (updater: (prev: { scale: number, dx: number, dy: number }) => { scale: number, dx: number, dy: number }) => {
-      updateCanvasData({ transform: updater(transform) });
+      updateCanvasData(prev => ({ transform: updater(prev.transform) }));
   };
 
 
@@ -292,9 +291,8 @@ export default function CanvasPage() {
   }, [canvasId, user, toast, router]);
 
   const cancelEditing = useCallback(() => {
-    if (editingElementId && textareaRef.current) {
-      const newContent = textareaRef.current.value;
-      handleElementsChange(prev => prev.map(el => 'content' in el && el.id === editingElementId ? { ...el, content: newContent } : el), true);
+    if (editingElementId) {
+      handleElementsChange(prev => prev, true); // This will add the final edit to history
     }
     setEditingElementId(null);
     setAction('none');
@@ -369,14 +367,14 @@ export default function CanvasPage() {
   const handleSuggestConnections = useCallback(async () => {
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
     try {
-      const elementIdentifiers = elements.map(el => 'content' in el ? el.content : `drawing-${el.id}`).filter(Boolean) as string[]; 
+      const elementIdentifiers = elements.map(el => `element-id-${el.id}`).filter(Boolean) as string[]; 
       const result = await suggestConnectionsAction({ notes, diagramElements: elementIdentifiers });
       
       if (result.connections.length > 0) {
         const newConnections: DiagramConnection[] = [];
         result.connections.forEach(conn => {
-          const sourceEl = elements.find(el => 'content' in el && el.content === conn.source);
-          const targetEl = elements.find(el => 'content' in el && el.content === conn.target);
+          const sourceEl = elements.find(el => `element-id-${el.id}` === conn.source);
+          const targetEl = elements.find(el => `element-id-${el.id}` === conn.target);
           if (sourceEl && targetEl) {
             newConnections.push({
               id: `conn-${Date.now()}-${Math.random()}`,
@@ -479,7 +477,6 @@ export default function CanvasPage() {
       setGhostElement({
         id: 'ghost',
         type: activeTool,
-        content: '',
         x: canvasCoords.x,
         y: canvasCoords.y,
         width: 0,
@@ -605,8 +602,9 @@ export default function CanvasPage() {
         handleElementsChange(prev => 
             initialState.current!.elements!.map(el => {
                 if (selectedElementIds.includes(el.id)) {
-                    if (el.type === 'drawing' && 'points' in el) {
-                        const originalElement = initialState.current!.elements!.find(iel => iel.id === el.id)! as Extract<DiagramElement, {type: 'drawing'}>;
+                    const originalElement = initialState.current!.elements!.find(iel => iel.id === el.id)!;
+
+                    if (el.type === 'drawing' && 'points' in el && 'points' in originalElement) {
                         const newPoints = originalElement.points.map(p => ({
                             x: p.x + dx / transform.scale,
                             y: p.y + dy / transform.scale,
@@ -614,8 +612,8 @@ export default function CanvasPage() {
                         const bounds = getBoundsForDrawing(newPoints);
                         return { ...el, type: 'drawing', points: newPoints, ...bounds };
                     }
-                    if ('x' in el) {
-                        return { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale };
+                    if ('x' in el && 'x' in originalElement) {
+                        return { ...el, x: originalElement.x + dx / transform.scale, y: originalElement.y + dy / transform.scale };
                     }
                 }
                 return el;
@@ -696,7 +694,6 @@ export default function CanvasPage() {
           const newElement: DiagramElement = {
               id: `el-${Date.now()}`,
               type: activeTool,
-              content: '',
               width: defaultWidth,
               height: defaultHeight,
               x: canvasCoords.x - defaultWidth / 2, 
@@ -712,7 +709,6 @@ export default function CanvasPage() {
         const newElement: DiagramElement = {
           ...ghostElement,
           id: `el-${Date.now()}`,
-          content: '',
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
         handleElementsChange(prev => [...prev, newElement], true);
@@ -727,7 +723,7 @@ export default function CanvasPage() {
     else if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
         const sourceElementId = initialState.current.sourceElementId;
         const newElementId = `el-${Date.now()}`;
-        const finalGhost = { ...ghostElement, id: newElementId, content: '' };
+        const finalGhost = { ...ghostElement, id: newElementId };
         
         const newConnection: DiagramConnection = {
             id: `conn-${Date.now()}`,
@@ -740,11 +736,7 @@ export default function CanvasPage() {
         setAction('none');
     } else {
         if (isHistoryEvent && action !== 'drawing') { // drawing handles its own history
-             const newEntry = { elements, connections };
-             const newHistory = history.slice(0, historyIndex + 1);
-             newHistory.push(newEntry);
-             setHistory(newHistory);
-             setHistoryIndex(newHistory.length - 1);
+             handleElementsChange(prev => prev, true);
         }
         if (action !== 'editing') {
           setAction('none');
@@ -776,7 +768,7 @@ export default function CanvasPage() {
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    handleElementsChange(prev => prev.map(el => 'content' in el && el.id === editingElementId ? { ...el, content: newContent } : el));
+    // handleElementsChange(prev => prev.map(el => 'content' in el && el.id === editingElementId ? { ...el, content: newContent } : el));
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -856,7 +848,7 @@ export default function CanvasPage() {
       </div>
        {action === 'editing' && editingElementId && (
           (() => {
-              const el = elements.find(e => e.id === editingElementId) as Extract<DiagramElement, { content: string }>;
+              const el = elements.find(e => e.id === editingElementId) as Extract<DiagramElement, { x: number }>;
               if (!el) return null;
               
               const left = transform.dx + el.x * transform.scale;
@@ -867,7 +859,7 @@ export default function CanvasPage() {
               return (
                   <textarea
                       ref={textareaRef}
-                      value={el.content}
+                      defaultValue={''}
                       onChange={handleTextareaChange}
                       onBlur={cancelEditing}
                       onKeyDown={(e) => {

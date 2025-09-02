@@ -36,15 +36,12 @@ function parseDiagramLayout(layout: string): DiagramElement[] {
     else if (lowerLine.includes('sticky note')) type = 'sticky-note';
     else if (lowerLine.includes('text label')) type = 'text';
 
-    // Extract content within quotes
     const contentMatch = line.match(/['"](.*?)['"]/);
-    const content = contentMatch ? contentMatch[1] : line;
 
     if (type) {
       elements.push({
         id: `el-${idCounter++}`,
         type,
-        content,
         x: 100 + (index % 4) * 200,
         y: 100 + Math.floor(index / 4) * 150,
         width: 150,

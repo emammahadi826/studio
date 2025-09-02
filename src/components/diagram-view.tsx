@@ -15,9 +15,7 @@ function getSvgPathFromStroke(stroke: {x:number, y:number}[]) {
     (acc, { x, y }, i, a) => {
       if (i === 0) return `M ${x},${y}`;
       const [lastX, lastY] = [a[i-1].x, a[i-1].y];
-      const [nextX, nextY] = [a[i+1]?.x, a[i+1]?.y];
-      const C = (p1:number, p2:number) => (p1 + p2) / 2;
-      return `${acc} Q ${lastX},${lastY} ${C(lastX,x)},${C(lastY,y)}`;
+      return `${acc} L ${lastX},${lastY}`;
     },
     ""
   );
@@ -151,36 +149,7 @@ function Element({
     cursor: 'move',
   };
 
-  const textDiv = (
-    <div 
-        xmlns="http://www.w3.org/1999/xhtml" 
-        className="flex items-center justify-center h-full text-center p-2 break-words text-sm font-sans"
-        style={{ 
-          color: 'hsl(var(--foreground))', 
-          fontFamily: 'Inter', 
-          pointerEvents: 'none',
-          visibility: isEditing ? 'hidden' : 'visible' 
-        }}
-    >
-        
-    </div>
-  )
-
-  const stickyNoteTextDiv = (
-      <div 
-        xmlns="http://www.w3.org/1999/xhtml" 
-        className="flex items-center justify-center h-full text-center p-4 break-words"
-        style={{ 
-          color: '#333', 
-          fontFamily: 'Inter', 
-          pointerEvents: 'none',
-          visibility: isEditing ? 'hidden' : 'visible' 
-        }}
-    >
-        
-    </div>
-  )
-
+  
   const handleSize = 8 / transform.scale;
   const handles: { position: ResizingHandle; cursor: string; x: number; y: number }[] = [
     { position: 'top-left', cursor: 'nwse-resize', x: bounds.x - handleSize/2, y: bounds.y - handleSize/2 },
@@ -210,14 +179,12 @@ function Element({
         return (
           <>
             <rect {...commonProps} {...styleProps} rx={8 / transform.scale} ry={8 / transform.scale} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       case 'circle':
         return (
           <>
             <ellipse cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       case 'diamond':
@@ -226,7 +193,6 @@ function Element({
         return (
           <>
             <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       case 'triangle': {
@@ -235,7 +201,6 @@ function Element({
         return (
           <>
             <polygon points={points} {...styleProps} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            <foreignObject {...commonProps}>{textDiv}</foreignObject>
           </>
         );
       }
@@ -261,7 +226,6 @@ function Element({
                   {...styleProps}
                 />
                 <rect {...commonProps} fill="transparent" />
-                <foreignObject {...commonProps}>{textDiv}</foreignObject>
             </g>
           </>
         );
@@ -270,12 +234,11 @@ function Element({
         return (
           <>
             <rect {...commonProps} {...styleProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`} style={{ filter: 'drop-shadow(3px 3px 2px rgba(0,0,0,0.2))', cursor: 'move' }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick} />
-            <foreignObject {...commonProps} transform={`rotate(-2 ${bounds.x + bounds.width/2} ${bounds.y + bounds.height/2})`}>{stickyNoteTextDiv}</foreignObject>
           </>
         );
       case 'text':
         return (
-            <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>{textDiv}</foreignObject>
+            <foreignObject {...commonProps} cursor="move" onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}></foreignObject>
         );
       case 'drawing': {
         if (!element.points || element.points.length === 0) return null;

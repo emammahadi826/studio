@@ -40,7 +40,7 @@ export interface CanvasData {
     connections: DiagramConnection[];
     toolbarPosition: { x: number, y: number };
     transform: { scale: number, dx: number, dy: number };
-    createdAt: Timestamp;
-    lastModified: Timestamp;
+    createdAt?: Timestamp;
+    lastModified?: Timestamp;
     userId: string;
 }

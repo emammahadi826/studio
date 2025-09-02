@@ -229,12 +229,6 @@ export function CanvasHeader({
         </Tabs>
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onUndo} disabled={!canUndo} aria-label="Undo">
-            <Undo2 className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onRedo} disabled={!canRedo} aria-label="Redo">
-            <Redo2 className="h-4 w-4" />
-        </Button>
       </div>
     </header>
   );
