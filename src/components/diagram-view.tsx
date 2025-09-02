@@ -420,7 +420,7 @@ function Marquee({ rect, transform }: { rect: { x: number; y: number; width: num
             {...rect}
             rx={8 / transform.scale}
             ry={8 / transform.scale}
-            fill="transparent"
+            fill="hsla(var(--primary-raw), 0.3)"
             stroke="hsl(var(--primary))"
             strokeWidth={1 / transform.scale}
         />
