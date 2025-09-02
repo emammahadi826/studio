@@ -67,7 +67,7 @@ export default function CanvasPage() {
   const transform = canvasData?.transform || { scale: 1, dx: 0, dy: 0 };
   
   const [isMounted, setIsMounted] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(isEditingName);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState(canvasName);
 
   const [action, setAction] = useState<Action>('none');
@@ -871,6 +871,7 @@ export default function CanvasPage() {
       <div 
         className="w-full h-full"
         style={{ cursor: getCursor() }}
+        onWheel={handleWheel}
       >
         <DiagramView 
             elements={elements} 
@@ -886,7 +887,6 @@ export default function CanvasPage() {
             toolbarPosition={toolbarPosition}
             onToolbarMouseDown={handleToolbarMouseDown}
             transform={transform}
-            onWheel={handleWheel}
         />
       </div>
        {action === 'editing' && editingElementId && (
@@ -942,7 +942,7 @@ export default function CanvasPage() {
   )
 
   const notepad = (
-     <div className="w-full h-full">
+     <div className="w-full h-full overflow-y-auto">
       <NotepadView content={notes} onContentChange={handleNotesChange} />
     </div>
   )
@@ -976,7 +976,7 @@ export default function CanvasPage() {
         {view === 'canvas' && diagramView}
         {view === 'both' && (
           <>
-            <div className="w-1/2 h-full overflow-y-auto">{notepad}</div>
+            <div className="w-1/2 h-full">{notepad}</div>
             <Separator orientation="vertical" />
             <div className="w-1/2 h-full">{diagramView}</div>
           </>
@@ -985,5 +985,3 @@ export default function CanvasPage() {
     </main>
   );
 }
-
-    
