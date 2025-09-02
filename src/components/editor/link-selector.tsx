@@ -63,7 +63,7 @@ export const LinkSelector = ({
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"
           data-active={editor.isActive('link')}
           onClick={(e) => {
             if (editor.state.selection.empty) {
@@ -81,7 +81,7 @@ export const LinkSelector = ({
           <Link className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-2" align="start" side="bottom">
+      <PopoverContent className="w-80 p-2" align="start" side="right">
         <div className="flex items-center gap-1">
           <Input
             autoFocus

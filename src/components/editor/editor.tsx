@@ -57,8 +57,8 @@ export function Editor(props: EditorProps) {
         
         if (editorContainerRef.current) {
             const containerRect = editorContainerRef.current.getBoundingClientRect();
-            const toolbarWidth = 450; 
-            const toolbarHeight = 40;
+            const toolbarWidth = 52; 
+            const toolbarHeight = 500; 
 
             let newX = dragStartPos.current.toolbarX + dx;
             let newY = dragStartPos.current.toolbarY + dy;
