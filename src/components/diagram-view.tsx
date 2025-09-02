@@ -135,7 +135,7 @@ function Element({
 }) {
   const [isHovered, setIsHovered] = React.useState(false);
   
-  const bounds = element.type === 'drawing' ? getBoundsForDrawing(element.points) : element;
+  const bounds = element.type === 'drawing' && 'points' in element ? getBoundsForDrawing(element.points) : element;
 
   const commonProps = {
     x: bounds.x,
@@ -159,7 +159,7 @@ function Element({
           color: 'hsl(var(--foreground))', 
           fontFamily: 'Inter', 
           pointerEvents: 'none',
-          visibility: 'hidden'
+          visibility: isEditing ? 'hidden' : 'visible' 
         }}
     >
         {element.content}
@@ -177,7 +177,7 @@ function Element({
           visibility: isEditing ? 'hidden' : 'visible' 
         }}
     >
-        {isEditing ? element.content : null}
+        {element.content}
     </div>
   )
 
@@ -438,7 +438,7 @@ function Marquee({ rect, transform }: { rect: { x: number; y: number; width: num
             {...rect}
             rx={8 / transform.scale}
             ry={8 / transform.scale}
-            fill="hsla(217, 91%, 60%, 0.3)"
+            fill="hsla(var(--primary), 0.1)"
             stroke="hsl(var(--primary))"
             strokeWidth={1 / transform.scale}
         />
@@ -451,8 +451,8 @@ function Connection({ connection, elements, transform }: { connection: DiagramCo
 
     if (!sourceEl || !targetEl) return null;
 
-    const sourceBounds = sourceEl.type === 'drawing' ? getBoundsForDrawing(sourceEl.points) : sourceEl;
-    const targetBounds = targetEl.type === 'drawing' ? getBoundsForDrawing(targetEl.points) : targetEl;
+    const sourceBounds = sourceEl.type === 'drawing' && 'points' in sourceEl ? getBoundsForDrawing(sourceEl.points) : sourceEl;
+    const targetBounds = targetEl.type === 'drawing' && 'points' in targetEl ? getBoundsForDrawing(targetEl.points) : targetEl;
     
     const x1 = sourceBounds.x + sourceBounds.width / 2;
     const y1 = sourceBounds.y + sourceBounds.height / 2;
@@ -542,3 +542,5 @@ export function DiagramView({
     </div>
   );
 }
+
+    

@@ -39,8 +39,8 @@ function getBoundsForDrawing(points: {x: number, y: number}[]) {
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-function isIntersecting(a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }) {
-  const aBounds = 'points' in a ? getBoundsForDrawing((a as any).points) : a;
+function isIntersecting(a: DiagramElement, b: { x: number, y: number, width: number, height: number }) {
+  const aBounds = 'points' in a && a.points ? getBoundsForDrawing(a.points) : a;
   return !(b.x > aBounds.x + aBounds.width || b.x + b.width < aBounds.x || b.y > aBounds.y + aBounds.height || b.y + b.height < aBounds.y);
 }
 
@@ -92,6 +92,7 @@ export default function CanvasPage() {
     toolbarY?: number;
     initialTransform?: { scale: number, dx: number, dy: number };
     currentPath?: { id: string, points: { x: number, y: number }[] };
+    initialSelectedIds?: string[];
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -520,6 +521,7 @@ export default function CanvasPage() {
         if (!e.shiftKey) {
             setSelectedElementIds([]);
         }
+        initialState.current.initialSelectedIds = e.shiftKey ? [...selectedElementIds] : [];
     }
   };
 
@@ -568,12 +570,9 @@ export default function CanvasPage() {
         setMarqueeRect(currentMarqueeRect);
 
         const intersectingIds = elements.filter(el => isIntersecting(el, currentMarqueeRect)).map(el => el.id);
+        const baseIds = initialState.current.initialSelectedIds || [];
         
-        setSelectedElementIds(ids => {
-            const baseIds = e.shiftKey ? ids.filter(id => !intersectingIds.includes(id)) : [];
-            const newIds = e.shiftKey ? [...intersectingIds, ...ids.filter(id => intersectingIds.includes(id))] : intersectingIds;
-            return [...new Set([...baseIds, ...newIds])];
-        });
+        setSelectedElementIds([...new Set([...baseIds, ...intersectingIds])]);
 
     } else if (action === 'creatingShape' && activeTool && ghostElement && activeTool !== 'pen' && activeTool !== 'pan') {
         if (!initialState.current) return;
@@ -603,8 +602,9 @@ export default function CanvasPage() {
         handleElementsChange(prev => 
             initialState.current!.elements!.map(el => {
                 if (selectedElementIds.includes(el.id)) {
-                    if (el.type === 'drawing') {
-                        const newPoints = el.points.map(p => ({
+                    if (el.type === 'drawing' && 'points' in el) {
+                        const originalElement = initialState.current!.elements!.find(iel => iel.id === el.id)! as Extract<DiagramElement, {type: 'drawing'}>;
+                        const newPoints = originalElement.points.map(p => ({
                             x: p.x + dx / transform.scale,
                             y: p.y + dy / transform.scale,
                         }));
@@ -691,7 +691,7 @@ export default function CanvasPage() {
           const newElement: DiagramElement = {
               ...ghostElement,
               id: `el-${Date.now()}`,
-              content: `New ${activeTool}`,
+              content: ``,
               width: defaultWidth,
               height: defaultHeight,
               x: ghostElement.x - defaultWidth / 2, 
@@ -707,7 +707,7 @@ export default function CanvasPage() {
         const newElement: DiagramElement = {
           ...ghostElement,
           id: `el-${Date.now()}`,
-          content: `New ${activeTool}`,
+          content: ``,
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
         handleElementsChange(prev => [...prev, newElement], true);
@@ -722,7 +722,7 @@ export default function CanvasPage() {
     else if (action === 'creating' && ghostElement && initialState.current?.sourceElementId) {
         const sourceElementId = initialState.current.sourceElementId;
         const newElementId = `el-${Date.now()}`;
-        const finalGhost = { ...ghostElement, id: newElementId, content: 'New rectangle' };
+        const finalGhost = { ...ghostElement, id: newElementId, content: '' };
         
         const newConnection: DiagramConnection = {
             id: `conn-${Date.now()}`,
@@ -929,5 +929,7 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    
 
     
