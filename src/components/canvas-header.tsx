@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Download, MoreVertical, SquarePen, Trash2, Workflow, History, Plus, Copy, Archive, Upload, Settings, Home, Eye, Edit, Check, Undo2, Redo2 } from 'lucide-react';
+import { Download, MoreVertical, SquarePen, Trash2, Workflow, History, Plus, Copy, Archive, Upload, Settings, Home, Eye, Edit, Check, Undo2, Redo2, Combine, Book, Spline } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,7 +33,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 
-export type View = 'notepad' | 'diagram';
+export type View = 'document' | 'canvas' | 'both';
 
 interface CanvasHeaderProps {
   view: View;
@@ -213,13 +213,17 @@ export function CanvasHeader({
       <div className="absolute left-1/2 -translate-x-1/2">
         <Tabs value={view} onValueChange={(value) => value && onViewChange(value as View)} className="w-full">
             <TabsList>
-                <TabsTrigger value="notepad">
-                    <SquarePen className="w-4 h-4 mr-2" />
-                    Notepad
+                <TabsTrigger value="document">
+                    <Book className="w-4 h-4 mr-2" />
+                    Document
                 </TabsTrigger>
-                <TabsTrigger value="diagram">
-                    <Workflow className="w-4 h-4 mr-2" />
-                    Diagram
+                <TabsTrigger value="both">
+                    <Combine className="w-4 h-4 mr-2" />
+                    Both
+                </TabsTrigger>
+                <TabsTrigger value="canvas">
+                    <Spline className="w-4 h-4 mr-2" />
+                    Canvas
                 </TabsTrigger>
             </TabsList>
         </Tabs>
@@ -235,5 +239,3 @@ export function CanvasHeader({
     </header>
   );
 }
-
-    

@@ -12,9 +12,10 @@ import type { DiagramElement, DiagramConnection, CanvasMetadata, CanvasData } fr
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, deleteDoc, collection, addDoc, Timestamp } from 'firebase/firestore';
+import { Separator } from '@/components/ui/separator';
 
 
-export type View = 'notepad' | 'diagram';
+export type View = 'document' | 'canvas' | 'both';
 type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creatingShape' | 'marquee' | 'editing' | 'draggingToolbar' | 'drawing';
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
@@ -40,7 +41,7 @@ function getBoundsForDrawing(points: {x: number, y: number}[]) {
 }
 
 function isIntersecting(a: DiagramElement, b: { x: number, y: number, width: number, height: number }) {
-  const aBounds = 'points' in a && a.points ? getBoundsForDrawing(a.points) : a;
+  const aBounds = a.type === 'drawing' && a.points ? getBoundsForDrawing(a.points) : a;
   return !(b.x > aBounds.x + aBounds.width || b.x + b.width < aBounds.x || b.y > aBounds.y + aBounds.height || b.y + b.height < aBounds.y);
 }
 
@@ -52,7 +53,7 @@ export default function CanvasPage() {
   const { user, loading } = useAuth();
   const { toast } = useToast();
 
-  const [view, setView] = useState<View>('notepad');
+  const [view, setView] = useState<View>('both');
   
   // State for all canvas data
   const [canvasData, setCanvasData] = useState<CanvasData | null>(null);
@@ -141,6 +142,9 @@ export default function CanvasPage() {
     if (dataToSave.elements) {
       dataToSave.elements = dataToSave.elements.map((el: DiagramElement) => {
         const cleanEl = { ...el };
+        if ('content' in cleanEl && cleanEl.content === undefined) {
+            delete (cleanEl as any).content;
+        }
         if (cleanEl.backgroundColor === undefined) {
           delete (cleanEl as any).backgroundColor;
         }
@@ -290,7 +294,7 @@ export default function CanvasPage() {
   const cancelEditing = useCallback(() => {
     if (editingElementId && textareaRef.current) {
       const newContent = textareaRef.current.value;
-      handleElementsChange(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el), true);
+      handleElementsChange(prev => prev.map(el => 'content' in el && el.id === editingElementId ? { ...el, content: newContent } : el), true);
     }
     setEditingElementId(null);
     setAction('none');
@@ -365,14 +369,14 @@ export default function CanvasPage() {
   const handleSuggestConnections = useCallback(async () => {
     toast({ title: 'Suggesting Connections...', description: 'AI is analyzing relationships between elements.' });
     try {
-      const elementIdentifiers = elements.map(el => el.content).filter(Boolean); 
+      const elementIdentifiers = elements.map(el => 'content' in el ? el.content : `drawing-${el.id}`).filter(Boolean) as string[]; 
       const result = await suggestConnectionsAction({ notes, diagramElements: elementIdentifiers });
       
       if (result.connections.length > 0) {
         const newConnections: DiagramConnection[] = [];
         result.connections.forEach(conn => {
-          const sourceEl = elements.find(el => el.content === conn.source);
-          const targetEl = elements.find(el => el.content === conn.target);
+          const sourceEl = elements.find(el => 'content' in el && el.content === conn.source);
+          const targetEl = elements.find(el => 'content' in el && el.content === conn.target);
           if (sourceEl && targetEl) {
             newConnections.push({
               id: `conn-${Date.now()}-${Math.random()}`,
@@ -467,7 +471,6 @@ export default function CanvasPage() {
         type: 'drawing',
         points: newPath.points,
         x: 0, y: 0, width: 0, height: 0, // These will be calculated later
-        
       };
       handleElementsChange(prev => [...prev, newDrawingElement]);
       return;
@@ -476,7 +479,7 @@ export default function CanvasPage() {
       setGhostElement({
         id: 'ghost',
         type: activeTool,
-        
+        content: '',
         x: canvasCoords.x,
         y: canvasCoords.y,
         width: 0,
@@ -611,7 +614,9 @@ export default function CanvasPage() {
                         const bounds = getBoundsForDrawing(newPoints);
                         return { ...el, type: 'drawing', points: newPoints, ...bounds };
                     }
-                    return { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale };
+                    if ('x' in el) {
+                        return { ...el, x: el.x + dx / transform.scale, y: el.y + dy / transform.scale };
+                    }
                 }
                 return el;
             })
@@ -620,8 +625,8 @@ export default function CanvasPage() {
         const elementId = selectedElementIds[0];
         handleElementsChange(prevElements =>
             prevElements.map(el => {
-                if (el.id === elementId) {
-                    const originalElement = initialState.current!.elements!.find(iel => iel.id === elementId)!;
+                if (el.id === elementId && 'width' in el) {
+                    const originalElement = initialState.current!.elements!.find(iel => iel.id === elementId)! as Extract<DiagramElement, { width: number }>;
                     let { x, y, width, height } = originalElement;
                     const aspectRatio = originalElement.width / originalElement.height;
                     const minSize = 20;
@@ -663,7 +668,7 @@ export default function CanvasPage() {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
-    const isHistoryEvent = action === 'dragging' || action === 'resizing' || action === 'drawing';
+    const isHistoryEvent = action === 'dragging' || action === 'resizing' || action === 'drawing' || action === 'creatingShape';
 
     if (e.button === 1) { // Middle mouse button
         if (action === 'panning') {
@@ -682,20 +687,20 @@ export default function CanvasPage() {
             // If it's just a click, remove the temporary drawing element
             handleElementsChange(prev => prev.filter(el => el.id !== id), false);
         }
-        setAction('none');
     }
     else if (action === 'creatingShape' && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
       if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
+          const canvasCoords = screenToCanvas(e.clientX, e.clientY);
           const defaultWidth = 150;
           const defaultHeight = activeTool === 'sticky-note' ? 150 : (activeTool === 'text' ? 40 : 80);
           const newElement: DiagramElement = {
-              ...ghostElement,
               id: `el-${Date.now()}`,
-              
+              type: activeTool,
+              content: '',
               width: defaultWidth,
               height: defaultHeight,
-              x: ghostElement.x - defaultWidth / 2, 
-              y: ghostElement.y - defaultHeight / 2,
+              x: canvasCoords.x - defaultWidth / 2, 
+              y: canvasCoords.y - defaultHeight / 2,
               backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
           };
           handleElementsChange(prev => [...prev, newElement], true);
@@ -707,7 +712,7 @@ export default function CanvasPage() {
         const newElement: DiagramElement = {
           ...ghostElement,
           id: `el-${Date.now()}`,
-          
+          content: '',
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
         handleElementsChange(prev => [...prev, newElement], true);
@@ -730,18 +735,20 @@ export default function CanvasPage() {
             target: { elementId: newElementId },
         };
 
-        handleElementsChange(prev => [...prev, finalGhost], true);
+        handleElementsChange(prev => [...prev, finalGhost as DiagramElement], true);
         handleConnectionsChange(prev => [...prev, newConnection], false);
         setAction('none');
     } else {
-        if (isHistoryEvent) {
+        if (isHistoryEvent && action !== 'drawing') { // drawing handles its own history
              const newEntry = { elements, connections };
              const newHistory = history.slice(0, historyIndex + 1);
              newHistory.push(newEntry);
              setHistory(newHistory);
              setHistoryIndex(newHistory.length - 1);
         }
-        setAction('none');
+        if (action !== 'editing') {
+          setAction('none');
+        }
     }
     
     if (action !== 'editing') {
@@ -754,7 +761,7 @@ export default function CanvasPage() {
 
   const handleElementDoubleClick = (elementId: string) => {
     const el = elements.find(e => e.id === elementId);
-    if (el?.type === 'drawing') return;
+    if (!el || el.type === 'drawing') return;
     cancelEditing(); 
     setAction('editing');
     setEditingElementId(elementId);
@@ -769,7 +776,7 @@ export default function CanvasPage() {
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    handleElementsChange(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
+    handleElementsChange(prev => prev.map(el => 'content' in el && el.id === editingElementId ? { ...el, content: newContent } : el));
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -818,6 +825,92 @@ export default function CanvasPage() {
         </div>
       )
   }
+  
+  const diagramView = (
+    <div className="w-full h-full relative"
+      onMouseMove={handleCanvasMouseMove} 
+      onMouseUp={handleCanvasMouseUp} 
+      onMouseLeave={handleCanvasMouseUp}
+      onClick={handleCanvasClick}
+      onWheel={handleWheel}
+    >
+      <div 
+        className="w-full h-full"
+        style={{ cursor: getCursor() }}
+      >
+        <DiagramView 
+            elements={elements} 
+            connections={connections} 
+            ghostElement={ghostElement}
+            marqueeRect={marqueeRect}
+            onToolSelect={handleToolSelect}
+            onCanvasMouseDown={handleCanvasMouseDown}
+            selectedElementIds={selectedElementIds}
+            activeTool={activeTool}
+            editingElementId={editingElementId}
+            onElementDoubleClick={handleElementDoubleClick}
+            toolbarPosition={toolbarPosition}
+            onToolbarMouseDown={handleToolbarMouseDown}
+            transform={transform}
+        />
+      </div>
+       {action === 'editing' && editingElementId && (
+          (() => {
+              const el = elements.find(e => e.id === editingElementId) as Extract<DiagramElement, { content: string }>;
+              if (!el) return null;
+              
+              const left = transform.dx + el.x * transform.scale;
+              const top = transform.dy + el.y * transform.scale;
+              const width = el.width * transform.scale;
+              const height = el.height * transform.scale;
+              
+              return (
+                  <textarea
+                      ref={textareaRef}
+                      value={el.content}
+                      onChange={handleTextareaChange}
+                      onBlur={cancelEditing}
+                      onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              cancelEditing();
+                          }
+                          if (e.key === 'Escape') {
+                              cancelEditing();
+                          }
+                      }}
+                      style={{
+                          position: 'absolute',
+                          left: left,
+                          top: top,
+                          width: width,
+                          height: height,
+                          background: 'transparent',
+                          border: '2px solid hsl(var(--primary))',
+                          color: 'hsl(var(--foreground))',
+                          resize: 'none',
+                          textAlign: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: `${8 * transform.scale}px`,
+                          boxSizing: 'border-box',
+                          fontFamily: 'Inter, sans-serif',
+                          fontSize: `${14 * transform.scale}px`,
+                          zIndex: 100,
+                      }}
+                  />
+              );
+          })()
+      )}
+    </div>
+  )
+
+  const notepad = (
+     <div className="w-full h-full">
+      <NotepadView content={notes} onContentChange={handleNotesChange} />
+    </div>
+  )
 
   return (
     <main className="h-screen w-screen bg-background overflow-hidden flex flex-col">
@@ -840,96 +933,20 @@ export default function CanvasPage() {
         canRedo={historyIndex < history.length - 1}
       />
       <div 
-        className="flex-grow relative"
+        className="flex-grow flex"
         style={{ paddingTop }}
         ref={canvasContainerRef}
       >
-          <div className={`w-full h-full transition-opacity duration-300 ease-in-out ${view === 'notepad' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <NotepadView content={notes} onContentChange={handleNotesChange} />
-          </div>
-          <div className={`absolute inset-0 transition-opacity duration-300 ease-in-out ${view === 'diagram' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-            style={{ top: paddingTop }}
-            onMouseMove={handleCanvasMouseMove} 
-            onMouseUp={handleCanvasMouseUp} 
-            onMouseLeave={handleCanvasMouseUp}
-            onClick={handleCanvasClick}
-            onWheel={handleWheel}
-          >
-            <div 
-              className="w-full h-full"
-              style={{ cursor: getCursor() }}
-            >
-              <DiagramView 
-                  elements={elements} 
-                  connections={connections} 
-                  ghostElement={ghostElement}
-                  marqueeRect={marqueeRect}
-                  onToolSelect={handleToolSelect}
-                  onCanvasMouseDown={handleCanvasMouseDown}
-                  selectedElementIds={selectedElementIds}
-                  activeTool={activeTool}
-                  editingElementId={editingElementId}
-                  onElementDoubleClick={handleElementDoubleClick}
-                  toolbarPosition={toolbarPosition}
-                  onToolbarMouseDown={handleToolbarMouseDown}
-                  transform={transform}
-              />
-            </div>
-             {action === 'editing' && editingElementId && (
-                (() => {
-                    const el = elements.find(e => e.id === editingElementId);
-                    if (!el) return null;
-                    
-                    const left = transform.dx + el.x * transform.scale;
-                    const top = transform.dy + el.y * transform.scale;
-                    const width = el.width * transform.scale;
-                    const height = el.height * transform.scale;
-                    
-                    return (
-                        <textarea
-                            ref={textareaRef}
-                            value={el.content}
-                            onChange={handleTextareaChange}
-                            onBlur={cancelEditing}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    cancelEditing();
-                                }
-                                if (e.key === 'Escape') {
-                                    cancelEditing();
-                                }
-                            }}
-                            style={{
-                                position: 'absolute',
-                                left: left,
-                                top: top,
-                                width: width,
-                                height: height,
-                                background: 'transparent',
-                                border: '2px solid hsl(var(--primary))',
-                                color: 'hsl(var(--foreground))',
-                                resize: 'none',
-                                textAlign: 'center',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: `${8 * transform.scale}px`,
-                                boxSizing: 'border-box',
-                                fontFamily: 'Inter, sans-serif',
-                                fontSize: `${14 * transform.scale}px`,
-                                zIndex: 100,
-                            }}
-                        />
-                    );
-                })()
-            )}
-          </div>
+        {view === 'document' && notepad}
+        {view === 'canvas' && diagramView}
+        {view === 'both' && (
+          <>
+            <div className="w-1/2 h-full">{notepad}</div>
+            <Separator orientation="vertical" />
+            <div className="w-1/2 h-full">{diagramView}</div>
+          </>
+        )}
       </div>
     </main>
   );
 }
-
-    
-
-    
