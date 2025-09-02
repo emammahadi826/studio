@@ -574,13 +574,13 @@ a.href = url;
         updateCanvasData(prev => ({ toolbarPosition: { x: newX, y: newY }}));
     } else if (action === 'panning') {
         if (!initialState.current?.initialTransform) return;
-        updateCanvasData(prev => ({
+        updateCanvasData(prev => prev ? ({
           transform: {
             ...prev.transform,
             dx: initialState.current!.initialTransform!.dx + dx,
             dy: initialState.current!.initialTransform!.dy + dy,
           }
-        }));
+        }) : null);
     } else if (action === 'marquee' && marqueeRect) {
         if (!initialState.current) return;
         const startCoords = screenToCanvas(initialState.current.mouseX, initialState.current.mouseY);
@@ -994,3 +994,4 @@ a.href = url;
     
 
     
+
