@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Download, MoreVertical, SquarePen, Trash2, Workflow, History, Plus, Copy, Archive, Upload, Settings, Home, Eye, Edit, Check } from 'lucide-react';
+import { Download, MoreVertical, SquarePen, Trash2, Workflow, History, Plus, Copy, Archive, Upload, Settings, Home, Eye, Edit, Check, Undo2, Redo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -48,6 +48,10 @@ interface CanvasHeaderProps {
   onToggleEditName: (isEditing: boolean) => void;
   editingNameValue: string;
   onEditingNameChange: (value: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export function CanvasHeader({
@@ -63,6 +67,10 @@ export function CanvasHeader({
   onToggleEditName,
   editingNameValue,
   onEditingNameChange,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: CanvasHeaderProps) {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
@@ -83,6 +91,16 @@ export function CanvasHeader({
                 </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={onUndo} disabled={!canUndo}>
+                        <Undo2 className="w-4 h-4 mr-2" />
+                        Undo
+                        <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem onClick={onRedo} disabled={!canRedo}>
+                        <Redo2 className="w-4 h-4 mr-2" />
+                        Redo
+                        <DropdownMenuShortcut>⌘Y</DropdownMenuShortcut>
+                    </DropdownMenuItem>
                     <DropdownMenuItem disabled>
                         <History className="w-4 h-4 mr-2" />
                         Version History
@@ -207,8 +225,15 @@ export function CanvasHeader({
         </Tabs>
       </div>
       <div className="flex items-center gap-2">
-        {/* Export and other buttons are now inside the 3-dot menu */}
+        <Button variant="ghost" size="icon" onClick={onUndo} disabled={!canUndo} aria-label="Undo">
+            <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onRedo} disabled={!canRedo} aria-label="Redo">
+            <Redo2 className="h-4 w-4" />
+        </Button>
       </div>
     </header>
   );
 }
+
+    

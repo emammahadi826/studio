@@ -19,6 +19,11 @@ type Action = 'none' | 'panning' | 'dragging' | 'resizing' | 'creating' | 'creat
 type ResizingHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
 interface MarqueeRect { x: number; y: number; width: number; height: number; }
+interface HistoryEntry {
+  elements: DiagramElement[];
+  connections: DiagramConnection[];
+}
+
 
 function getBoundsForDrawing(points: {x: number, y: number}[]) {
     if (!points || points.length === 0) {
@@ -72,6 +77,11 @@ export default function CanvasPage() {
   const [ghostElement, setGhostElement] = useState<DiagramElement | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<MarqueeRect | null>(null);
   
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isDirty, setIsDirty] = useState(false);
+
+
   const initialState = useRef<{
     elements?: DiagramElement[];
     mouseX: number;
@@ -85,8 +95,6 @@ export default function CanvasPage() {
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
 
   // --- Data handling Effects ---
   
@@ -102,6 +110,11 @@ export default function CanvasPage() {
             if (!isEditingName) {
               setEditingNameValue(data.name);
             }
+            // Initialize history
+            if (historyIndex === -1 && data.elements && data.connections) {
+                setHistory([{ elements: data.elements, connections: data.connections }]);
+                setHistoryIndex(0);
+            }
         } else {
             if (!canvasData) {
               console.error("Canvas not found or permissions issue.");
@@ -115,72 +128,78 @@ export default function CanvasPage() {
     });
 
     return () => unsubscribe();
-  }, [canvasId, user, router, toast, isEditingName]);
+  }, [canvasId, user, router, toast, isEditingName, historyIndex]);
 
   
-  // Debounced save effect
-  const saveCanvas = useCallback(async (dataToSave: CanvasData) => {
-    if (!user || !canvasId) return;
+  const saveCanvas = useCallback(async () => {
+    if (!user || !canvasId || !canvasData || !isDirty) return;
 
-    // Create a deep copy to avoid mutating the state directly
-    const cleanData = JSON.parse(JSON.stringify(dataToSave));
-
-    // Sanitize elements to remove any undefined `backgroundColor` fields
-    if (cleanData.elements) {
-      cleanData.elements = cleanData.elements.map((el: DiagramElement) => {
-        if (el.backgroundColor === undefined) {
-          delete el.backgroundColor;
+    const dataToSave = { ...canvasData };
+    
+    // Sanitize elements
+    if (dataToSave.elements) {
+      dataToSave.elements = dataToSave.elements.map((el: DiagramElement) => {
+        const cleanEl = { ...el };
+        if (cleanEl.backgroundColor === undefined) {
+          delete (cleanEl as any).backgroundColor;
         }
-        return el;
+        return cleanEl;
       });
     }
-
 
     try {
       const docRef = doc(db, "users", user.uid, "canvases", canvasId);
       await setDoc(docRef, {
-        ...cleanData,
+        ...dataToSave,
         lastModified: serverTimestamp(),
       }, { merge: true });
+      setIsDirty(false); // Reset dirty state after successful save
     } catch (error) {
       console.error("Failed to save to Firestore", error);
     }
-  }, [user, canvasId]);
+  }, [user, canvasId, canvasData, isDirty]);
 
+  // Periodic save effect
   useEffect(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    if (canvasData) { 
-      saveTimeoutRef.current = setTimeout(() => {
-        saveCanvas(canvasData);
-      }, 500); // 500ms debounce
-    }
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [canvasData, saveCanvas]);
+    const interval = setInterval(() => {
+      saveCanvas();
+    }, 5000); // Check for changes every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [saveCanvas]);
 
 
-  const updateCanvasData = useCallback((updates: Partial<CanvasData>) => {
+  const updateCanvasData = useCallback((updates: Partial<CanvasData>, addToHistory = false) => {
     setCanvasData(prev => {
         if (!prev) return null;
-        return { ...prev, ...updates };
+        const newState = { ...prev, ...updates };
+
+        if (addToHistory && (updates.elements || updates.connections)) {
+            const newEntry: HistoryEntry = {
+                elements: updates.elements || prev.elements,
+                connections: updates.connections || prev.connections,
+            };
+            const newHistory = history.slice(0, historyIndex + 1);
+            newHistory.push(newEntry);
+            setHistory(newHistory);
+            setHistoryIndex(newHistory.length - 1);
+        }
+        
+        setIsDirty(true);
+        return newState;
     });
-  }, []);
+  }, [history, historyIndex]);
   
   const handleCanvasNameChange = (name: string) => {
     updateCanvasData({ name });
     setIsEditingName(false);
   };
   const handleNotesChange = (notes: string) => updateCanvasData({ notes });
-  const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[]) => {
-      updateCanvasData({ elements: updater(elements) });
+  const handleElementsChange = useCallback((updater: (prev: DiagramElement[]) => DiagramElement[], addToHistory = false) => {
+      updateCanvasData({ elements: updater(elements) }, addToHistory);
   }, [elements, updateCanvasData]);
-  const handleConnectionsChange = useCallback((updater: (prev: DiagramConnection[]) => DiagramConnection[]) => {
-      updateCanvasData({ connections: updater(connections) });
+  const handleConnectionsChange = useCallback((updater: (prev: DiagramConnection[]) => DiagramConnection[], addToHistory = false) => {
+      updateCanvasData({ connections: updater(connections) }, addToHistory);
   }, [connections, updateCanvasData]);
   const handleToolbarPositionChange = (position: { x: number, y: number }) => updateCanvasData({ toolbarPosition: position });
   const handleTransformChange = (updater: (prev: { scale: number, dx: number, dy: number }) => { scale: number, dx: number, dy: number }) => {
@@ -194,6 +213,26 @@ export default function CanvasPage() {
 
   
   // --- Action Handlers ---
+
+   const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      const prevState = history[newIndex];
+      setCanvasData(prev => prev ? { ...prev, ...prevState } : null);
+      setIsDirty(true);
+    }
+  }, [history, historyIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      const nextState = history[newIndex];
+      setCanvasData(prev => prev ? { ...prev, ...nextState } : null);
+      setIsDirty(true);
+    }
+  }, [history, historyIndex]);
 
   const handleCreateNewCanvas = useCallback(async () => {
     if (!user) {
@@ -218,13 +257,6 @@ export default function CanvasPage() {
         lastModified: serverTimestamp(),
       });
       
-      const newCanvasWithTimestamps: CanvasData = {
-          ...newCanvasData,
-          createdAt: Timestamp.now(),
-          lastModified: Timestamp.now(),
-      };
-      
-      setCanvasData(newCanvasWithTimestamps);
       router.push(`/canvas/${docRef.id}`);
 
     } catch (error) {
@@ -236,8 +268,8 @@ export default function CanvasPage() {
   const handleDeleteSelected = useCallback(() => {
     if (selectedElementIds.length === 0) return;
 
-    handleElementsChange(prev => prev.filter(el => !selectedElementIds.includes(el.id)));
-    handleConnectionsChange(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)));
+    handleElementsChange(prev => prev.filter(el => !selectedElementIds.includes(el.id)), true);
+    handleConnectionsChange(prev => prev.filter(conn => !selectedElementIds.includes(conn.source.elementId) && !selectedElementIds.includes(conn.target.elementId)), false);
     setSelectedElementIds([]);
     toast({ title: 'Elements Deleted', duration: 2000 });
   }, [selectedElementIds, toast, handleElementsChange, handleConnectionsChange]);
@@ -257,7 +289,7 @@ export default function CanvasPage() {
   const cancelEditing = useCallback(() => {
     if (editingElementId && textareaRef.current) {
       const newContent = textareaRef.current.value;
-      handleElementsChange(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el));
+      handleElementsChange(prev => prev.map(el => el.id === editingElementId ? { ...el, content: newContent } : el), true);
     }
     setEditingElementId(null);
     setAction('none');
@@ -268,6 +300,14 @@ export default function CanvasPage() {
         if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0 && action !== 'editing') {
             e.preventDefault(); 
             handleDeleteSelected();
+        }
+        if (e.key === 'z' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            handleUndo();
+        }
+        if (e.key === 'y' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            handleRedo();
         }
         if (e.key === 'Escape') {
           if (action === 'editing') {
@@ -286,7 +326,7 @@ export default function CanvasPage() {
     return () => {
         window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedElementIds, handleDeleteSelected, action, cancelEditing]);
+  }, [selectedElementIds, handleDeleteSelected, action, cancelEditing, handleUndo, handleRedo]);
 
   useEffect(() => {
     if (action === 'editing' && textareaRef.current) {
@@ -311,7 +351,7 @@ export default function CanvasPage() {
     try {
       const result = await generateDiagramAction({ notes });
       if (result.elements.length > 0) {
-        handleElementsChange(() => result.elements);
+        handleElementsChange(() => result.elements, true);
         toast({ title: 'Diagram Generated!', description: 'The AI has created a diagram from your notes.' });
       } else {
         toast({ variant: "destructive", title: 'Generation Failed', description: 'Could not generate a diagram. Try rephrasing your notes.' });
@@ -340,7 +380,7 @@ export default function CanvasPage() {
             });
           }
         });
-        handleConnectionsChange(prev => [...prev, ...newConnections]);
+        handleConnectionsChange(prev => [...prev, ...newConnections], true);
         toast({ title: 'Connections Suggested!', description: 'AI has added connections between elements.' });
       } else {
         toast({ variant: "destructive", title: 'No Connections Found', description: 'The AI could not find any clear connections to suggest.' });
@@ -560,7 +600,7 @@ export default function CanvasPage() {
       setGhostElement(newElement);
 
     } else if (action === 'dragging' && selectedElementIds.length > 0 && initialState.current.elements) {
-        handleElementsChange(() => 
+        handleElementsChange(prev => 
             initialState.current!.elements!.map(el => {
                 if (selectedElementIds.includes(el.id)) {
                     if (el.type === 'drawing') {
@@ -583,21 +623,38 @@ export default function CanvasPage() {
                 if (el.id === elementId) {
                     const originalElement = initialState.current!.elements!.find(iel => iel.id === elementId)!;
                     let { x, y, width, height } = originalElement;
+                    const aspectRatio = originalElement.width / originalElement.height;
                     const minSize = 20;
 
-                    if (resizingHandle.includes('bottom')) { height = Math.max(minSize, originalElement.height + dy / transform.scale); }
-                    if (resizingHandle.includes('top')) {
-                        const newHeight = originalElement.height - dy / transform.scale;
-                        height = newHeight > minSize ? newHeight : minSize;
-                        y = newHeight > minSize ? originalElement.y + dy / transform.scale : originalElement.y + originalElement.height - minSize;
+                    let newWidth = width;
+                    let newHeight = height;
+
+                    if (resizingHandle.includes('bottom')) { newHeight = originalElement.height + dy / transform.scale; }
+                    if (resizingHandle.includes('top')) { 
+                        newHeight = originalElement.height - dy / transform.scale;
+                        if(newHeight > minSize) y = originalElement.y + dy / transform.scale;
                     }
-                    if (resizingHandle.includes('right')) { width = Math.max(minSize, originalElement.width + dx / transform.scale); }
-                    if (resizingHandle.includes('left')) {
-                        const newWidth = originalElement.width - dx / transform.scale;
-                        width = newWidth > minSize ? newWidth : minSize;
-                        x = newWidth > minSize ? originalElement.x + dx / transform.scale : originalElement.x + originalElement.width - minSize;
+                    if (resizingHandle.includes('right')) { newWidth = originalElement.width + dx / transform.scale; }
+                    if (resizingHandle.includes('left')) { 
+                        newWidth = originalElement.width - dx / transform.scale;
+                        if(newWidth > minSize) x = originalElement.x + dx / transform.scale;
                     }
-                    return { ...el, x, y, width, height };
+
+                    newWidth = Math.max(minSize, newWidth);
+                    newHeight = Math.max(minSize, newHeight);
+
+                    if (e.shiftKey && originalElement.width && originalElement.height) {
+                         if (resizingHandle.includes('left') || resizingHandle.includes('right')) {
+                            newHeight = newWidth / aspectRatio;
+                        } else {
+                            newWidth = newHeight * aspectRatio;
+                        }
+
+                        if (resizingHandle.includes('top')) { y = originalElement.y + (originalElement.height - newHeight); }
+                        if (resizingHandle.includes('left')) { x = originalElement.x + (originalElement.width - newWidth); }
+                    }
+
+                    return { ...el, x, y, width: newWidth, height: newHeight };
                 }
                 return el;
             })
@@ -606,6 +663,8 @@ export default function CanvasPage() {
   };
 
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
+    const isHistoryEvent = action === 'dragging' || action === 'resizing' || action === 'drawing';
+
     if (e.button === 1) { // Middle mouse button
         if (action === 'panning') {
             setAction('none');
@@ -618,15 +677,14 @@ export default function CanvasPage() {
         if (points.length > 1) {
             handleElementsChange(prev => prev.map(el => 
                 el.id === id ? { ...el, ...getBoundsForDrawing(points) } : el
-            ));
+            ), true);
         } else {
             // If it's just a click, remove the temporary drawing element
-            handleElementsChange(prev => prev.filter(el => el.id !== id));
+            handleElementsChange(prev => prev.filter(el => el.id !== id), false);
         }
         setAction('none');
     }
     else if (action === 'creatingShape' && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
-      // If the user didn't drag to create a shape, create a default-sized one
       if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
           const defaultWidth = 150;
           const defaultHeight = activeTool === 'sticky-note' ? 150 : (activeTool === 'text' ? 40 : 80);
@@ -636,16 +694,15 @@ export default function CanvasPage() {
               content: `New ${activeTool}`,
               width: defaultWidth,
               height: defaultHeight,
-              x: ghostElement.x - defaultWidth / 2, // Center it on the cursor
+              x: ghostElement.x - defaultWidth / 2, 
               y: ghostElement.y - defaultHeight / 2,
               backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
           };
-          handleElementsChange(prev => [...prev, newElement]);
+          handleElementsChange(prev => [...prev, newElement], true);
           setSelectedElementIds([newElement.id]);
           setEditingElementId(newElement.id);
           setAction('editing');
       } 
-      // If they did drag, create the shape with the dragged dimensions
       else if (ghostElement) {
         const newElement: DiagramElement = {
           ...ghostElement,
@@ -653,7 +710,7 @@ export default function CanvasPage() {
           content: `New ${activeTool}`,
           backgroundColor: activeTool === 'sticky-note' ? '#FFF9C4' : undefined,
         };
-        handleElementsChange(prev => [...prev, newElement]);
+        handleElementsChange(prev => [...prev, newElement], true);
         setSelectedElementIds([newElement.id]);
         setEditingElementId(newElement.id);
         setAction('editing');
@@ -673,10 +730,17 @@ export default function CanvasPage() {
             target: { elementId: newElementId },
         };
 
-        handleElementsChange(prev => [...prev, finalGhost]);
-        handleConnectionsChange(prev => [...prev, newConnection]);
+        handleElementsChange(prev => [...prev, finalGhost], true);
+        handleConnectionsChange(prev => [...prev, newConnection], false);
         setAction('none');
     } else {
+        if (isHistoryEvent) {
+             const newEntry = { elements, connections };
+             const newHistory = history.slice(0, historyIndex + 1);
+             newHistory.push(newEntry);
+             setHistory(newHistory);
+             setHistoryIndex(newHistory.length - 1);
+        }
         setAction('none');
     }
     
@@ -770,6 +834,10 @@ export default function CanvasPage() {
         onToggleEditName={setIsEditingName}
         editingNameValue={editingNameValue}
         onEditingNameChange={setEditingNameValue}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={historyIndex > 0}
+        canRedo={historyIndex < history.length - 1}
       />
       <div 
         className="flex-grow relative"
@@ -861,3 +929,5 @@ export default function CanvasPage() {
     </main>
   );
 }
+
+    
