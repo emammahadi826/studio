@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Circle, Square, Type, StickyNote, Diamond, Triangle, Cylinder, Move, MousePointer2, Pen, Hand } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -133,7 +133,7 @@ function Element({
   isEditing: boolean;
   transform: { scale: number };
 }) {
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
   
   const bounds = element.type === 'drawing' ? getBoundsForDrawing(element.points) : element;
 
@@ -159,7 +159,7 @@ function Element({
           color: 'hsl(var(--foreground))', 
           fontFamily: 'Inter', 
           pointerEvents: 'none',
-          visibility: isEditing ? 'hidden' : 'visible'
+          visibility: 'hidden'
         }}
     >
         {element.content}
@@ -177,7 +177,7 @@ function Element({
           visibility: isEditing ? 'hidden' : 'visible' 
         }}
     >
-        {element.content}
+        {isEditing ? element.content : null}
     </div>
   )
 
