@@ -67,7 +67,7 @@ export default function CanvasPage() {
   const transform = canvasData?.transform || { scale: 1, dx: 0, dy: 0 };
   
   const [isMounted, setIsMounted] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(isMounted);
   const [editingNameValue, setEditingNameValue] = useState(canvasName);
 
   const [action, setAction] = useState<Action>('none');
@@ -624,7 +624,7 @@ a.href = url;
       };
       setGhostElement(newElement);
 
-    } else if (action === 'dragging' && selectedElementIds.length > 0 && initialState.current.elements) {
+    } else if (action === 'dragging' && selectedElementIds.length > 0 && initialState.current?.elements) {
         updateCanvasData(prev => ({
             elements: initialState.current!.elements!.map(el => {
                 if (selectedElementIds.includes(el.id)) {
@@ -645,7 +645,7 @@ a.href = url;
                 return el;
             })
         }));
-    } else if (action === 'resizing' && selectedElementIds.length === 1 && resizingHandle && initialState.current.elements) {
+    } else if (action === 'resizing' && selectedElementIds.length === 1 && resizingHandle && initialState.current?.elements) {
         const elementId = selectedElementIds[0];
         updateCanvasData(prev => ({
             elements: prev.elements.map(el => {
@@ -999,5 +999,7 @@ a.href = url;
     </main>
   );
 }
+
+    
 
     
