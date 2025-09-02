@@ -686,6 +686,14 @@ export default function CanvasPage() {
     }
   };
 
+  const createNewElement = useCallback((el: DiagramElement) => {
+        handleElementsChange(prev => [...prev, el], true);
+        setSelectedElementIds([el.id]);
+        setEditingElementId(el.id);
+        setAction('editing');
+  }, [handleElementsChange]);
+
+
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
     const isHistoryEvent = action === 'dragging' || action === 'resizing' || action === 'drawing' || action === 'creatingShape';
 
@@ -708,13 +716,6 @@ export default function CanvasPage() {
         }
     }
     else if (action === 'creatingShape' && activeTool && activeTool !== 'pen' && activeTool !== 'pan') {
-      const createNewElement = (el: DiagramElement) => {
-          handleElementsChange(prev => [...prev, el], true);
-          setSelectedElementIds([el.id]);
-          setEditingElementId(el.id);
-          setAction('editing');
-      }
-
       if (ghostElement && ghostElement.width < 5 && ghostElement.height < 5) {
           const canvasCoords = screenToCanvas(e.clientX, e.clientY);
           const defaultWidth = 150;
